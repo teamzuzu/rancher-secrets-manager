@@ -1,0 +1,226 @@
+name: E2E
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  RANCHER_VERSION: "2.14.1"
+  CERT_MANAGER_VERSION: "v1.16.3"
+  RANCHER_BOOTSTRAP_PASSWORD: "adminadmin"
+  NETWORK: rancher-ci
+  MANAGEMENT: management
+  DOWNSTREAM_COUNT: 2
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # ── build ──────────────────────────────────────────────────────────────
+
+      - name: Build controller image
+        run: make docker-build IMG=rancher-secrets-manager:ci
+
+      # ── tooling ───────────────────────────────────────────────────────────
+
+      - name: Install k3d
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      # ── clusters ──────────────────────────────────────────────────────────
+
+      - name: Create Docker network
+        run: docker network create ${{ env.NETWORK }}
+
+      - name: Create management cluster
+        run: |
+          k3d cluster create ${{ env.MANAGEMENT }} \
+            --network ${{ env.NETWORK }} \
+            --k3s-arg "--disable=traefik,servicelb@server:*" \
+            -p "80:80@loadbalancer" \
+            -p "443:443@loadbalancer" \
+            --wait
+
+      - name: Create downstream clusters
+        run: |
+          for i in $(seq 1 ${{ env.DOWNSTREAM_COUNT }}); do
+            k3d cluster create downstream-${i} \
+              --network ${{ env.NETWORK }} \
+              --k3s-arg "--disable=traefik,servicelb@server:*" \
+              --wait
+          done
+
+      - name: Resolve Rancher hostname
+        id: rancher-host
+        run: |
+          LB_IP=$(docker inspect k3d-${{ env.MANAGEMENT }}-serverlb \
+            --format '{{(index .NetworkSettings.Networks "${{ env.NETWORK }}").IPAddress}}')
+          echo "lb_ip=${LB_IP}" >> "$GITHUB_OUTPUT"
+          # nip.io resolves <ip-dashes>.nip.io → IP; reachable from all containers on the network
+          echo "host=rancher.${LB_IP//./-}.nip.io" >> "$GITHUB_OUTPUT"
+
+      # ── cert-manager ──────────────────────────────────────────────────────
+
+      - name: Install cert-manager
+        run: |
+          kubectl --context k3d-${{ env.MANAGEMENT }} apply \
+            -f https://github.com/cert-manager/cert-manager/releases/download/${{ env.CERT_MANAGER_VERSION }}/cert-manager.yaml
+          kubectl --context k3d-${{ env.MANAGEMENT }} -n cert-manager \
+            rollout status deployment/cert-manager --timeout=120s
+          kubectl --context k3d-${{ env.MANAGEMENT }} -n cert-manager \
+            rollout status deployment/cert-manager-webhook --timeout=120s
+
+      # ── Rancher ───────────────────────────────────────────────────────────
+
+      - name: Install Rancher
+        env:
+          RANCHER_HOST: ${{ steps.rancher-host.outputs.host }}
+        run: |
+          helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+          helm repo update rancher-stable
+          helm upgrade --install rancher rancher-stable/rancher \
+            --kube-context k3d-${{ env.MANAGEMENT }} \
+            --namespace cattle-system \
+            --create-namespace \
+            --version ${{ env.RANCHER_VERSION }} \
+            --set hostname="${RANCHER_HOST}" \
+            --set bootstrapPassword="${{ env.RANCHER_BOOTSTRAP_PASSWORD }}" \
+            --set replicas=1 \
+            --set ingress.tls.source=rancher \
+            --wait \
+            --timeout 10m
+
+      - name: Wait for Rancher API
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+        run: |
+          for i in $(seq 1 30); do
+            HTTP=$(curl -sk -o /dev/null -w "%{http_code}" "${RANCHER_URL}/ping") || true
+            [ "$HTTP" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "Rancher API never became ready" && exit 1
+
+      - name: Obtain Rancher API token
+        id: rancher-token
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+        run: |
+          TOKEN=$(curl -sk -X POST "${RANCHER_URL}/v3-public/localProviders/local?action=login" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"admin\",\"password\":\"${{ env.RANCHER_BOOTSTRAP_PASSWORD }}\"}" \
+            | jq -r '.token')
+          echo "::add-mask::${TOKEN}"
+          echo "token=${TOKEN}" >> "$GITHUB_OUTPUT"
+
+      # ── import downstream clusters ────────────────────────────────────────
+
+      - name: Import downstream clusters
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+          RANCHER_TOKEN: ${{ steps.rancher-token.outputs.token }}
+        run: |
+          for i in $(seq 1 ${{ env.DOWNSTREAM_COUNT }}); do
+            CLUSTER_NAME="downstream-${i}"
+
+            CLUSTER_ID=$(curl -sk -X POST "${RANCHER_URL}/v3/clusters" \
+              -H "Authorization: Bearer ${RANCHER_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"type\":\"cluster\",\"name\":\"${CLUSTER_NAME}\"}" \
+              | jq -r '.id')
+
+            # Poll until registration token is created
+            MANIFEST_URL=""
+            for attempt in $(seq 1 20); do
+              MANIFEST_URL=$(curl -sk \
+                "${RANCHER_URL}/v3/clusterregistrationtokens?clusterId=${CLUSTER_ID}" \
+                -H "Authorization: Bearer ${RANCHER_TOKEN}" \
+                | jq -r '.data[0].manifestUrl // empty')
+              [ -n "$MANIFEST_URL" ] && break
+              sleep 3
+            done
+            [ -z "$MANIFEST_URL" ] && echo "No manifest URL for ${CLUSTER_NAME}" && exit 1
+
+            kubectl --context k3d-${CLUSTER_NAME} apply -f "${MANIFEST_URL}"
+            echo "Applied agent manifest to ${CLUSTER_NAME}"
+          done
+
+      - name: Wait for downstream clusters to become Active
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+          RANCHER_TOKEN: ${{ steps.rancher-token.outputs.token }}
+        run: |
+          for i in $(seq 1 ${{ env.DOWNSTREAM_COUNT }}); do
+            CLUSTER_NAME="downstream-${i}"
+            for attempt in $(seq 1 60); do
+              STATE=$(curl -sk "${RANCHER_URL}/v3/clusters?name=${CLUSTER_NAME}" \
+                -H "Authorization: Bearer ${RANCHER_TOKEN}" \
+                | jq -r '.data[0].state // empty')
+              [ "$STATE" = "active" ] && echo "${CLUSTER_NAME}: Active" && break
+              [ $attempt -eq 60 ] && echo "${CLUSTER_NAME} never became Active (last: $STATE)" && exit 1
+              sleep 5
+            done
+          done
+
+      # ── load controller image + install chart ─────────────────────────────
+
+      - name: Load controller image into management cluster
+        run: k3d image import rancher-secrets-manager:ci --cluster ${{ env.MANAGEMENT }}
+
+      - name: Install Helm chart
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+        run: |
+          helm upgrade --install rancher-secrets-manager charts/rancher-secrets-manager \
+            --kube-context k3d-${{ env.MANAGEMENT }} \
+            --namespace cattle-secrets-system \
+            --create-namespace \
+            --set image.tag=ci \
+            --set rancher.url="${RANCHER_URL}" \
+            --wait
+
+      # ── tests ─────────────────────────────────────────────────────────────
+
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: Run e2e tests
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+          RANCHER_TOKEN: ${{ steps.rancher-token.outputs.token }}
+          MGMT_KUBECONFIG: ${{ github.workspace }}/.kubeconfig-management
+        run: |
+          k3d kubeconfig get ${{ env.MANAGEMENT }} > "$MGMT_KUBECONFIG"
+          go test ./test/e2e/... -v -timeout 10m
+
+      # ── diagnostics on failure ────────────────────────────────────────────
+
+      - name: Dump controller logs on failure
+        if: failure()
+        run: |
+          kubectl --context k3d-${{ env.MANAGEMENT }} \
+            -n cattle-secrets-system logs -l app=rancher-secrets-manager --tail=200 || true
+
+      - name: Dump cluster states on failure
+        if: failure()
+        env:
+          RANCHER_URL: https://${{ steps.rancher-host.outputs.host }}
+          RANCHER_TOKEN: ${{ steps.rancher-token.outputs.token }}
+        run: |
+          curl -sk "${RANCHER_URL}/v3/clusters" \
+            -H "Authorization: Bearer ${RANCHER_TOKEN}" \
+            | jq '[.data[] | {name, state, conditions: .conditions}]' || true

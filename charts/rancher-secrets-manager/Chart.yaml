@@ -1,0 +1,15 @@
+apiVersion: v2
+name: rancher-secrets-manager
+description: Distributes secrets from the Rancher management cluster to downstream clusters.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - rancher
+  - secrets
+  - management
+home: https://github.com/txodds/rancher-secrets-manager
+annotations:
+  catalog.cattle.io/certified: partner
+  catalog.cattle.io/namespace: cattle-secrets-system
+  catalog.cattle.io/release-name: rancher-secrets-manager

@@ -1,0 +1,37 @@
+replicaCount: 1
+
+image:
+  repository: rancher-secrets-manager
+  pullPolicy: IfNotPresent
+  tag: ""  # defaults to .Chart.AppVersion
+
+imagePullSecrets: []
+
+rancher:
+  # url is the base URL of the Rancher API reachable from inside the management cluster.
+  # Defaults to the internal service address.
+  url: "https://rancher.cattle-system.svc"
+  # insecureTLS skips TLS verification. Use only in development.
+  insecureTLS: false
+  # caBundle is the path to a PEM CA bundle mounted into the controller pod.
+  caBundle: ""
+
+leaderElection:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}

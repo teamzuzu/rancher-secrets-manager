@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 600,
+            "statusMessage": "Watching CI run...",
+            "command": "INPUT=$(cat); CMD=$(printf '%s' \"$INPUT\" | jq -r '.tool_input.command // \"\"'); echo \"$CMD\" | grep -qE '(git push|gh pr (create|edit))' || exit 0; echo 'Waiting for CI run to register...'; sleep 5; gh run list --limit 5; RUNID=$(gh run list --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null); [ -n \"$RUNID\" ] && gh run watch \"$RUNID\" --exit-status || true"
+          }
+        ]
+      }
+    ]
+  }
+}
