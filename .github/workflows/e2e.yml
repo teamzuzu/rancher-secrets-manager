@@ -2,14 +2,27 @@ name: E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      rancher_version:
+        description: Rancher Helm chart version
+        default: "2.14.1"
+        required: false
+      downstream_count:
+        description: Number of downstream clusters to create
+        default: "2"
+        required: false
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
 
 env:
-  RANCHER_VERSION: "2.14.1"
+  RANCHER_VERSION: ${{ inputs.rancher_version || '2.14.1' }}
   CERT_MANAGER_VERSION: "v1.16.3"
   RANCHER_BOOTSTRAP_PASSWORD: "adminadmin"
   NETWORK: rancher-ci
   MANAGEMENT: management
-  DOWNSTREAM_COUNT: 2
+  DOWNSTREAM_COUNT: ${{ inputs.downstream_count || '2' }}
 
 jobs:
   e2e:
@@ -72,10 +85,8 @@ jobs:
           LB_IP=$(docker inspect k3d-${{ env.MANAGEMENT }}-serverlb \
             --format '{{(index .NetworkSettings.Networks "${{ env.NETWORK }}").IPAddress}}')
           echo "lb_ip=${LB_IP}" >> "$GITHUB_OUTPUT"
-          # host: nip.io hostname reachable from inside Docker (downstream agents use this)
+          # nip.io hostname reachable from inside Docker (downstream agents use this)
           echo "host=rancher.${LB_IP//./-}.nip.io" >> "$GITHUB_OUTPUT"
-          # local_url: reached via the 443:443 port binding from the runner host
-          echo "local_url=https://localhost" >> "$GITHUB_OUTPUT"
 
       # ── cert-manager ──────────────────────────────────────────────────────
 
@@ -211,9 +222,6 @@ jobs:
             --wait
 
       # ── tests ─────────────────────────────────────────────────────────────
-
-      - name: Run unit tests
-        run: go test ./...
 
       - name: Run e2e tests
         env:

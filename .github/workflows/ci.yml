@@ -58,6 +58,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: [lint, test]
     steps:
       - uses: actions/checkout@v4
 
@@ -69,7 +70,7 @@ jobs:
       - name: Build
         run: make build
 
+      - uses: azure/setup-helm@v4
+
       - name: Helm lint
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm lint charts/rancher-secrets-manager
+        run: helm lint charts/rancher-secrets-manager
