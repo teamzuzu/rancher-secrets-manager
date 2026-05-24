@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "rsm.fullname" . }}
+  labels:
+    {{- include "rsm.labels" . | nindent 4 }}
+rules:
+  # ManagedSecret CRD
+  - apiGroups: ["secrets.cattle.io"]
+    resources: ["managedsecrets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["secrets.cattle.io"]
+    resources: ["managedsecrets/status"]
+    verbs: ["get", "update", "patch"]
+
+  # Read source secrets from the management cluster
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # List Rancher clusters to resolve targets
+  - apiGroups: ["management.cattle.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list", "watch"]
+
+  # Leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
