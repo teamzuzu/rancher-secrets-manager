@@ -57,9 +57,10 @@ log "Creating Docker network: $NETWORK"
 docker network inspect "$NETWORK" &>/dev/null || docker network create "$NETWORK"
 
 log "Creating management cluster..."
+# Keep traefik — Rancher's Ingress requires an ingress controller.
 k3d cluster create "$MANAGEMENT" \
   --network "$NETWORK" \
-  --k3s-arg "--disable=traefik,servicelb@server:*" \
+  --k3s-arg "--disable=servicelb@server:*" \
   -p "80:80@loadbalancer" \
   -p "443:443@loadbalancer" \
   --wait

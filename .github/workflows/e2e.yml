@@ -48,9 +48,11 @@ jobs:
 
       - name: Create management cluster
         run: |
+          # Keep traefik enabled — Rancher's Ingress requires an ingress controller.
+          # Only disable servicelb (k3d provides its own LB via port binding).
           k3d cluster create ${{ env.MANAGEMENT }} \
             --network ${{ env.NETWORK }} \
-            --k3s-arg "--disable=traefik,servicelb@server:*" \
+            --k3s-arg "--disable=servicelb@server:*" \
             -p "80:80@loadbalancer" \
             -p "443:443@loadbalancer" \
             --wait
@@ -58,6 +60,7 @@ jobs:
       - name: Create downstream clusters
         run: |
           for i in $(seq 1 ${{ env.DOWNSTREAM_COUNT }}); do
+            # No ingress needed on downstream clusters — disable both to save memory.
             k3d cluster create downstream-${i} \
               --network ${{ env.NETWORK }} \
               --k3s-arg "--disable=traefik,servicelb@server:*" \
