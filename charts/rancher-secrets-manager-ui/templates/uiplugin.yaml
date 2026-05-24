@@ -1,0 +1,19 @@
+apiVersion: catalog.cattle.io/v1
+kind: UIPlugin
+metadata:
+  name: rancher-secrets-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: rancher-secrets-manager-ui
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+spec:
+  plugin:
+    name: rancher-secrets-manager
+    version: {{ .Chart.AppVersion | quote }}
+    endpoint: {{ include "rsm-ui.endpoint" . | quote }}
+    noCache: false
+    noAuth: false
+    metadata:
+      catalog.cattle.io/rancher-version:        ">= 2.9.0-0"
+      catalog.cattle.io/kube-version:           ">= 1.26.0-0"
+      catalog.cattle.io/ui-extensions-version:  ">= 2.0.0 < 4.0.0"
