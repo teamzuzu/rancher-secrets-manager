@@ -112,13 +112,26 @@ jobs:
       - name: Wait for Rancher API
         # Use localhost via the 443:443 port binding — the nip.io hostname resolves to a
         # Docker-internal IP unreachable from the runner host.
+        # Helm --wait only ensures the Deployment pods are Running; Rancher itself
+        # takes several additional minutes to initialize before /ping responds.
         run: |
-          for i in $(seq 1 40); do
-            HTTP=$(curl -sk -o /dev/null -w "%{http_code}" "https://localhost/ping") || true
-            [ "$HTTP" = "200" ] && exit 0
-            sleep 5
+          echo "Waiting for port 443 to open..."
+          for i in $(seq 1 30); do
+            nc -zv localhost 443 2>/dev/null && break || sleep 3
           done
-          echo "Rancher API never became ready" && exit 1
+          echo "Polling Rancher /ping (up to 10 min)..."
+          for i in $(seq 1 60); do
+            HTTP=$(curl -sk -o /dev/null -w "%{http_code}" "https://localhost/ping") || true
+            echo "Attempt $i/60: HTTP ${HTTP:-000}"
+            [ "$HTTP" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "=== Diagnostics ==="
+          kubectl --context k3d-${{ env.MANAGEMENT }} -n cattle-system get pods || true
+          kubectl --context k3d-${{ env.MANAGEMENT }} get ingress -A || true
+          kubectl --context k3d-${{ env.MANAGEMENT }} -n kube-system \
+            get pods -l app.kubernetes.io/name=traefik || true
+          exit 1
 
       - name: Obtain Rancher API token
         id: rancher-token
