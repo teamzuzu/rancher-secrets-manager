@@ -1,0 +1,3 @@
+# Base URL of the GitHub Pages site hosting the extension JS bundles.
+# Matches the standard GitHub Pages URL for this repository.
+baseUrl: "https://teamzuzu.github.io/rancher-secrets-manager"

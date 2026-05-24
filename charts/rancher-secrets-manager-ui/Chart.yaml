@@ -1,0 +1,23 @@
+apiVersion: v2
+name: rancher-secrets-manager-ui
+description: Rancher UI Extension — Secrets Manager dashboard for ManagedSecret resources
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/teamzuzu/rancher-secrets-manager
+keywords:
+  - rancher
+  - secrets
+  - extension
+  - ui
+annotations:
+  catalog.cattle.io/certified:              community
+  catalog.cattle.io/namespace:              cattle-ui-plugin-system
+  catalog.cattle.io/release-name:           rancher-secrets-manager-ui
+  catalog.cattle.io/permits-os:             "linux, windows"
+  catalog.cattle.io/scope:                  management
+  catalog.cattle.io/ui-component:           plugins
+  catalog.cattle.io/rancher-version:        ">= 2.9.0-0"
+  catalog.cattle.io/kube-version:           ">= 1.26.0-0"
+  catalog.cattle.io/ui-extensions-version:  ">= 2.0.0 < 4.0.0"
+  catalog.cattle.io/display-name:           "Secrets Manager"

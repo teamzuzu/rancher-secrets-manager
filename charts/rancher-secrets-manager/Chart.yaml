@@ -8,8 +8,8 @@ keywords:
   - rancher
   - secrets
   - management
-home: https://github.com/txodds/rancher-secrets-manager
+home: https://github.com/teamzuzu/rancher-secrets-manager
 annotations:
-  catalog.cattle.io/certified: partner
+  catalog.cattle.io/certified: community
   catalog.cattle.io/namespace: cattle-secrets-system
   catalog.cattle.io/release-name: rancher-secrets-manager

@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: rancher-secrets-manager
+  repository: ghcr.io/teamzuzu/rancher-secrets-manager
   pullPolicy: IfNotPresent
   tag: ""  # defaults to .Chart.AppVersion
 
