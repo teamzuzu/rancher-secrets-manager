@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-pkg/
+tmp/
+.nuxt/
+coverage/
+*.local
+assets/
+charts/
+extensions/
+index.yaml

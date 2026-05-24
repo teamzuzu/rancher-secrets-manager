@@ -1,0 +1,11 @@
+{
+  "extends": "./node_modules/@rancher/shell/tsconfig.json",
+  "include": ["pkg/**/*", "*.ts"],
+  "compilerOptions": {
+    "paths": {
+      "@shell/*":            ["./node_modules/@rancher/shell/*"],
+      "@pkg/*":              ["./pkg/*"],
+      "@rancher/auto-import": ["./node_modules/@rancher/shell/pkg/auto-import"]
+    }
+  }
+}
