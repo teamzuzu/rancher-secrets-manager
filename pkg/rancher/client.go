@@ -227,5 +227,5 @@ func buildTLSConfig(cfg Config) (*tls.Config, error) {
 // labelsAsSet wraps a map so it satisfies labels.Labels for selector matching.
 type labelsAsSet map[string]string
 
-func (l labelsAsSet) Has(key string) bool        { _, ok := l[key]; return ok }
-func (l labelsAsSet) Get(key string) string       { return l[key] }
+func (l labelsAsSet) Has(key string) bool   { _, ok := l[key]; return ok }
+func (l labelsAsSet) Get(key string) string { return l[key] }
