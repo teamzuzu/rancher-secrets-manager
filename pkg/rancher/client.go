@@ -5,6 +5,7 @@ package rancher
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"os"
@@ -218,8 +219,15 @@ func buildTLSConfig(cfg Config) (*tls.Config, error) {
 		InsecureSkipVerify: cfg.InsecureTLS, //nolint:gosec
 	}
 	if cfg.CABundlePath != "" {
-		// CA bundle loading can be added here if needed
-		// Using x509.NewCertPool() + AppendCertsFromPEM
+		pem, err := os.ReadFile(cfg.CABundlePath)
+		if err != nil {
+			return nil, fmt.Errorf("reading CA bundle %q: %w", cfg.CABundlePath, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("no valid certificates found in %q", cfg.CABundlePath)
+		}
+		tlsCfg.RootCAs = pool
 	}
 	return tlsCfg, nil
 }
@@ -227,5 +235,5 @@ func buildTLSConfig(cfg Config) (*tls.Config, error) {
 // labelsAsSet wraps a map so it satisfies labels.Labels for selector matching.
 type labelsAsSet map[string]string
 
-func (l labelsAsSet) Has(key string) bool        { _, ok := l[key]; return ok }
-func (l labelsAsSet) Get(key string) string       { return l[key] }
+func (l labelsAsSet) Has(key string) bool   { _, ok := l[key]; return ok }
+func (l labelsAsSet) Get(key string) string { return l[key] }
