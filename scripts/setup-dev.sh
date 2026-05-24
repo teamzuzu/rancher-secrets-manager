@@ -57,10 +57,11 @@ log "Creating Docker network: $NETWORK"
 docker network inspect "$NETWORK" &>/dev/null || docker network create "$NETWORK"
 
 log "Creating management cluster..."
-# Keep traefik — Rancher's Ingress requires an ingress controller.
+# Use k3s defaults (traefik + servicelb). servicelb (klipper) creates a hostPort
+# DaemonSet that binds port 443 on the k3s node — without it, traefik's
+# LoadBalancer service stays Pending and port 443 is never bound.
 k3d cluster create "$MANAGEMENT" \
   --network "$NETWORK" \
-  --k3s-arg "--disable=servicelb@server:*" \
   -p "80:80@loadbalancer" \
   -p "443:443@loadbalancer" \
   --wait
