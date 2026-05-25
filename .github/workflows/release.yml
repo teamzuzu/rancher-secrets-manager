@@ -64,7 +64,7 @@ jobs:
       # ── Helm charts + gh-pages publish ──────────────────────────────────────
       - uses: azure/setup-helm@v4
         with:
-          version: '3.x'  # Helm 4 changed repo index to not scan subdirs
+          version: 'v3.21.0'  # Helm 4 changed repo index to not scan subdirs
 
       - name: Checkout gh-pages
         uses: actions/checkout@v4
