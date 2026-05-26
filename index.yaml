@@ -6,8 +6,28 @@ entries:
       catalog.cattle.io/namespace: cattle-secrets-system
       catalog.cattle.io/release-name: rancher-secrets-manager
     apiVersion: v2
+    appVersion: 0.1.2
+    created: "2026-05-26T15:09:21.6008366Z"
+    description: Distributes secrets from the Rancher management cluster to downstream
+      clusters.
+    digest: 1455f1bca28dc854f0ab3f6841b50ef045c5bbfa31c5036e58f51ee04651e65e
+    home: https://github.com/teamzuzu/rancher-secrets-manager
+    keywords:
+    - rancher
+    - secrets
+    - management
+    name: rancher-secrets-manager
+    type: application
+    urls:
+    - https://teamzuzu.github.io/rancher-secrets-manager/rancher-secrets-manager-0.1.2.tgz
+    version: 0.1.2
+  - annotations:
+      catalog.cattle.io/certified: community
+      catalog.cattle.io/namespace: cattle-secrets-system
+      catalog.cattle.io/release-name: rancher-secrets-manager
+    apiVersion: v2
     appVersion: 0.1.0
-    created: "2026-05-25T23:22:11.330054006Z"
+    created: "2026-05-26T15:09:21.600574623Z"
     description: Distributes secrets from the Rancher management cluster to downstream
       clusters.
     digest: 38e202b3daa48f10292f3a20772b2bbfe8979ada25525955c9888f7a05c6c9e4
@@ -34,8 +54,36 @@ entries:
       catalog.cattle.io/ui-component: plugins
       catalog.cattle.io/ui-extensions-version: '>= 2.0.0 < 4.0.0'
     apiVersion: v2
+    appVersion: 0.1.2
+    created: "2026-05-26T15:09:21.601236079Z"
+    description: Rancher UI Extension — Secrets Manager dashboard for ManagedSecret
+      resources
+    digest: 60d9e87a84e3867e265769dfcb103f0f4c3f34f5e81f97634a81296fc0cbc4a2
+    home: https://github.com/teamzuzu/rancher-secrets-manager
+    keywords:
+    - rancher
+    - secrets
+    - extension
+    - ui
+    name: rancher-secrets-manager-ui
+    type: application
+    urls:
+    - https://teamzuzu.github.io/rancher-secrets-manager/rancher-secrets-manager-ui-0.1.2.tgz
+    version: 0.1.2
+  - annotations:
+      catalog.cattle.io/certified: community
+      catalog.cattle.io/display-name: Secrets Manager
+      catalog.cattle.io/kube-version: '>= 1.26.0-0'
+      catalog.cattle.io/namespace: cattle-ui-plugin-system
+      catalog.cattle.io/permits-os: linux, windows
+      catalog.cattle.io/rancher-version: '>= 2.9.0-0'
+      catalog.cattle.io/release-name: rancher-secrets-manager-ui
+      catalog.cattle.io/scope: management
+      catalog.cattle.io/ui-component: plugins
+      catalog.cattle.io/ui-extensions-version: '>= 2.0.0 < 4.0.0'
+    apiVersion: v2
     appVersion: 0.1.0
-    created: "2026-05-25T23:22:11.330386926Z"
+    created: "2026-05-26T15:09:21.601054982Z"
     description: Rancher UI Extension — Secrets Manager dashboard for ManagedSecret
       resources
     digest: b796afc02244ace67229b2a1bc58a36d9e69693a45f5a05511ef8a83f68360b2
@@ -50,4 +98,4 @@ entries:
     urls:
     - https://teamzuzu.github.io/rancher-secrets-manager/rancher-secrets-manager-ui-0.1.0.tgz
     version: 0.1.0
-generated: "2026-05-25T23:22:11.32960691Z"
+generated: "2026-05-26T15:09:21.600145891Z"
