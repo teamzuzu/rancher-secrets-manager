@@ -61,6 +61,12 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           yarn install --frozen-lockfile
+          # Stamp the plugin package.json so the bundled metadata matches the release version.
+          # build-pkg.sh copies this file verbatim into the dist; Rancher reads it to display
+          # the extension version in the Extensions UI.
+          jq --arg v "$VERSION" '.version = $v' \
+            pkg/rancher-secrets-manager/package.json > /tmp/_pkg.json
+          mv /tmp/_pkg.json pkg/rancher-secrets-manager/package.json
           yarn build-pkg
 
       # ── Helm charts + gh-pages publish ──────────────────────────────────────
