@@ -132,7 +132,7 @@ func (c *Client) BuildClusterConfig(clusterID string) (*rest.Config, error) {
 			Insecure: c.cfg.InsecureTLS,
 		},
 	}
-	if c.tlsConfig != nil && len(c.tlsConfig.RootCAs.Subjects()) > 0 { //nolint:staticcheck
+	if c.tlsConfig != nil && c.tlsConfig.RootCAs != nil {
 		cfg.TLSClientConfig.Insecure = false
 	}
 	// Attach the custom transport so the CA bundle is used.
