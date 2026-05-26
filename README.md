@@ -165,7 +165,10 @@ kubectl get managedsecret my-api-key \
 ## Uninstall
 
 1. **Remove the controller** — in Rancher, go to **☰ → Apps → Installed Apps**, find `rancher-secrets-manager`, and click **Delete**.
-2. **Remove the UI extension** — in **Extensions → Installed**, find *Secrets Manager* and click **Uninstall**.
+2. **Remove the UI extension** — go to **☰ → Apps → Installed Apps** (on the **local** cluster), find `rancher-secrets-manager-ui`, and click **Delete**.
+
+   > **Note:** The *Uninstall* button in the Extensions tab does not work for community extensions in Rancher 2.14. Use Apps → Installed Apps instead.
+
 3. **Remove the CRD** (optional — this deletes all ManagedSecret objects):
 
 ```bash
