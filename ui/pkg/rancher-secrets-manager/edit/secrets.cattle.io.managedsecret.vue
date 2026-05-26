@@ -67,7 +67,7 @@
         <div class="row mb-10">
           <div class="col span-6">
             <LabeledInput
-              v-model="newSecret.name"
+              v-model:value="newSecret.name"
               label="Secret Name"
               :mode="mode"
               placeholder="e.g. my-api-key"
@@ -102,14 +102,14 @@
         >
           <div class="col span-5">
             <LabeledInput
-              v-model="entry.key"
+              v-model:value="entry.key"
               :mode="mode"
               placeholder="API_TOKEN"
             />
           </div>
           <div class="col span-6 kv-value-col">
             <LabeledInput
-              v-model="entry.value"
+              v-model:value="entry.value"
               :mode="mode"
               :type="entry.showValue ? 'text' : 'password'"
               placeholder="value"
@@ -193,7 +193,7 @@
             class="col span-8"
           >
             <LabeledInput
-              v-model="target.clusterName"
+              v-model:value="target.clusterName"
               label="Cluster Name"
               :mode="mode"
               placeholder="e.g. production-eu"
@@ -206,7 +206,7 @@
             class="col span-8"
           >
             <LabeledInput
-              v-model="target.selectorLabels"
+              v-model:value="target.selectorLabels"
               label="Label Selector (key=value, comma-separated)"
               :mode="mode"
               placeholder="e.g. environment=staging,region=eu"
@@ -217,7 +217,7 @@
         <div class="row mb-5">
           <div class="col span-6">
             <LabeledInput
-              v-model="target.namespace"
+              v-model:value="target.namespace"
               label="Target Namespace"
               :mode="mode"
               placeholder="e.g. app"
@@ -226,7 +226,7 @@
           </div>
           <div class="col span-6">
             <LabeledInput
-              v-model="target.secretName"
+              v-model:value="target.secretName"
               label="Secret Name Override"
               :mode="mode"
               placeholder="Defaults to source secret name"
