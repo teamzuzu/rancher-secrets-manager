@@ -11,7 +11,7 @@ spec:
     name: rancher-secrets-manager
     version: {{ .Chart.AppVersion | quote }}
     endpoint: {{ include "rsm-ui.endpoint" . | quote }}
-    noCache: false
+    noCache: true
     noAuth: false
     metadata:
       catalog.cattle.io/rancher-version:        ">= 2.9.0-0"
