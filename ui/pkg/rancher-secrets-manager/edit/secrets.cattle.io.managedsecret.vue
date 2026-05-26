@@ -36,18 +36,18 @@
         <div class="row mb-10">
           <div class="col span-6">
             <LabeledSelect
-              v-model="sourceNamespace"
+              v-model:value="sourceNamespace"
               label="Namespace"
               :options="namespaceOptions"
               :loading="loadingMeta"
               :mode="mode"
               required
-              @update:model-value="sourceName = ''"
+              @update:value="sourceName = ''"
             />
           </div>
           <div class="col span-6">
             <LabeledSelect
-              v-model="sourceName"
+              v-model:value="sourceName"
               label="Secret"
               :options="secretOptions"
               :loading="loadingMeta"
@@ -76,7 +76,7 @@
           </div>
           <div class="col span-6">
             <LabeledSelect
-              v-model="newSecret.namespace"
+              v-model:value="newSecret.namespace"
               label="Namespace"
               :options="namespaceOptions"
               :loading="loadingMeta"
@@ -180,11 +180,11 @@
         <div class="row mb-5">
           <div class="col span-4">
             <LabeledSelect
-              v-model="target.selectorType"
+              v-model:value="target.selectorType"
               label="Target By"
               :mode="mode"
               :options="targetByOptions"
-              @update:model-value="clearTargetSelector(target)"
+              @update:value="clearTargetSelector(target)"
             />
           </div>
 
