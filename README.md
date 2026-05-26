@@ -105,7 +105,7 @@ All settings are available in the Rancher Apps install form. The most commonly c
 
 | Setting | Default | When to change |
 |---|---|---|
-| `rancher.url` | `https://rancher.cattle-system.svc` | Only if Rancher runs in a non-standard namespace or with a custom hostname |
+| `rancher.url` | `https://rancher.cattle-system` | Only if Rancher runs in a non-standard namespace or with a custom hostname |
 | `rancher.insecureTLS` | `false` | Local dev environments with self-signed certs |
 | `rancher.caBundle` | *(none)* | Rancher uses a private CA — provide the path to the PEM file mounted in the pod |
 | `replicaCount` | `1` | Set to `2` for high-availability deployments |

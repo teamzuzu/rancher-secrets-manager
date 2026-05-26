@@ -10,7 +10,7 @@ imagePullSecrets: []
 rancher:
   # url is the base URL of the Rancher API reachable from inside the management cluster.
   # Defaults to the internal service address.
-  url: "https://rancher.cattle-system.svc"
+  url: "https://rancher.cattle-system"
   # insecureTLS skips TLS verification. Use only in development.
   insecureTLS: false
   # caBundle is the path to a PEM CA bundle mounted into the controller pod.
