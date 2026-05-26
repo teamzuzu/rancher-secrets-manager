@@ -36,29 +36,29 @@
         <div class="row mb-10">
           <div class="col span-6">
             <LabeledSelect
-              v-model="value.spec.secretRef.namespace"
+              v-model="sourceNamespace"
               label="Namespace"
               :options="namespaceOptions"
               :loading="loadingMeta"
               :mode="mode"
               required
-              @update:model-value="value.spec.secretRef.name = ''"
+              @update:model-value="sourceName = ''"
             />
           </div>
           <div class="col span-6">
             <LabeledSelect
-              v-model="value.spec.secretRef.name"
+              v-model="sourceName"
               label="Secret"
               :options="secretOptions"
               :loading="loadingMeta"
-              :disabled="!value.spec.secretRef.namespace"
+              :disabled="!sourceNamespace"
               :mode="mode"
               required
             />
           </div>
         </div>
-        <p v-if="value.spec.secretRef.namespace && !secretOptions.length && !loadingMeta" class="text-muted hint">
-          No secrets found in <strong>{{ value.spec.secretRef.namespace }}</strong>. Switch to <em>Create New Secret</em> to add one.
+        <p v-if="sourceNamespace && !secretOptions.length && !loadingMeta" class="text-muted hint">
+          No secrets found in <strong>{{ sourceNamespace }}</strong>. Switch to <em>Create New Secret</em> to add one.
         </p>
       </template>
 
@@ -161,14 +161,14 @@
       </h3>
 
       <div
-        v-for="(target, idx) in value.spec.targets"
+        v-for="(target, idx) in localTargets"
         :key="idx"
         class="target-entry"
       >
         <div class="target-header">
           <strong>Target {{ idx + 1 }}</strong>
           <button
-            v-if="!isView && value.spec.targets.length > 1"
+            v-if="!isView && localTargets.length > 1"
             type="button"
             class="btn btn-sm role-link remove-btn"
             @click="removeTarget(idx)"
@@ -180,7 +180,7 @@
         <div class="row mb-5">
           <div class="col span-4">
             <LabeledSelect
-              v-model="target._selectorType"
+              v-model="target.selectorType"
               label="Target By"
               :mode="mode"
               :options="targetByOptions"
@@ -189,7 +189,7 @@
           </div>
 
           <div
-            v-if="target._selectorType === 'name'"
+            v-if="target.selectorType === 'name'"
             class="col span-8"
           >
             <LabeledInput
@@ -206,11 +206,10 @@
             class="col span-8"
           >
             <LabeledInput
-              v-model="target._selectorLabels"
+              v-model="target.selectorLabels"
               label="Label Selector (key=value, comma-separated)"
               :mode="mode"
               placeholder="e.g. environment=staging,region=eu"
-              @blur="parseSelectorLabels(target)"
             />
           </div>
         </div>
@@ -259,22 +258,20 @@ export default {
 
   data() {
     return {
-      errors:      [],
-      sourceMode:  'existing',
-      namespaces:  [],
-      allSecrets:  [],
-      loadingMeta: false,
+      errors:          [],
+      sourceMode:      'existing',
+      sourceNamespace: '',
+      sourceName:      '',
+      localTargets:    [],
+      namespaces:      [],
+      allSecrets:      [],
+      loadingMeta:     false,
 
       newSecret: {
         name:      '',
         namespace: 'cattle-secrets-system',
         entries:   [{ key: '', value: '', showValue: false }],
       },
-
-      sourceModeOptions: [
-        { label: 'Use existing secret', value: 'existing' },
-        { label: 'Create new secret',   value: 'create'   },
-      ],
 
       targetByOptions: [
         { label: 'Cluster Name',   value: 'name'     },
@@ -297,12 +294,10 @@ export default {
     },
 
     secretOptions() {
-      const ns = this.value.spec?.secretRef?.namespace;
-
-      if (!ns) return [];
+      if (!this.sourceNamespace) return [];
 
       return this.allSecrets
-        .filter(s => s.metadata?.namespace === ns)
+        .filter(s => s.metadata?.namespace === this.sourceNamespace)
         .map(s => s.metadata?.name)
         .filter(Boolean)
         .sort()
@@ -321,7 +316,7 @@ export default {
   },
 
   async created() {
-    this.initResource();
+    this.initForm();
     await this.fetchMeta();
   },
 
@@ -340,33 +335,36 @@ export default {
       }
     },
 
-    initResource() {
-      if (!this.value.spec) {
-        this.value.spec = { secretRef: { name: '', namespace: '' }, targets: [] };
-      }
-      if (!this.value.spec.secretRef) {
-        this.value.spec.secretRef = { name: '', namespace: '' };
-      }
-      if (!this.value.spec.targets?.length) {
-        this.value.spec.targets = [this.newTarget()];
-      }
+    // Populate local form state from value (called on create and after a failed save).
+    initForm() {
+      const spec = this.value.spec || {};
+      const ref  = spec.secretRef || {};
 
-      this.value.spec.targets.forEach((t) => {
-        if (!t._selectorType) {
-          t._selectorType = t.clusterName ? 'name' : 'selector';
-        }
-        if (!t._selectorLabels && t.clusterSelector?.matchLabels) {
-          t._selectorLabels = Object.entries(t.clusterSelector.matchLabels)
-            .map(([k, v]) => `${ k }=${ v }`)
-            .join(', ');
-        }
+      this.sourceNamespace = ref.namespace || '';
+      this.sourceName      = ref.name      || '';
+
+      const srcTargets = spec.targets?.length ? spec.targets : [this.blankTarget()];
+
+      this.localTargets = srcTargets.map((t) => {
+        const hasSelector = !!(t.clusterSelector?.matchLabels);
+
+        return {
+          selectorType:   t.clusterName ? 'name' : (hasSelector ? 'selector' : 'name'),
+          selectorLabels: hasSelector
+            ? Object.entries(t.clusterSelector.matchLabels).map(([k, v]) => `${ k }=${ v }`).join(', ')
+            : '',
+          clusterName:    t.clusterName || '',
+          clusterSelector: t.clusterSelector || null,
+          namespace:      t.namespace   || '',
+          secretName:     t.secretName  || '',
+        };
       });
     },
 
-    newTarget() {
+    blankTarget() {
       return {
-        _selectorType:   'name',
-        _selectorLabels: '',
+        selectorType:    'name',
+        selectorLabels:  '',
         clusterName:     '',
         clusterSelector: null,
         namespace:       '',
@@ -375,32 +373,31 @@ export default {
     },
 
     addTarget() {
-      this.value.spec.targets.push(this.newTarget());
+      this.localTargets.push(this.blankTarget());
     },
 
     removeTarget(idx) {
-      this.value.spec.targets.splice(idx, 1);
+      this.localTargets.splice(idx, 1);
     },
 
     clearTargetSelector(target) {
       target.clusterName     = '';
       target.clusterSelector = null;
-      target._selectorLabels = '';
+      target.selectorLabels  = '';
     },
 
-    parseSelectorLabels(target) {
-      const raw = (target._selectorLabels || '').trim();
-
-      if (!raw) { target.clusterSelector = null; return; }
+    parseSelectorLabels(raw) {
+      if (!raw?.trim()) return null;
 
       const matchLabels = {};
 
-      raw.split(',').forEach((pair) => {
+      raw.trim().split(',').forEach((pair) => {
         const [k, v] = pair.trim().split('=');
 
         if (k) matchLabels[k.trim()] = (v || '').trim();
       });
-      target.clusterSelector = { matchLabels };
+
+      return Object.keys(matchLabels).length ? { matchLabels } : null;
     },
 
     addEntry() {
@@ -421,26 +418,44 @@ export default {
           this.errors.push('Add at least one key–value entry.');
         }
       } else {
-        if (!this.value.spec?.secretRef?.namespace) this.errors.push('Source namespace is required.');
-        if (!this.value.spec?.secretRef?.name)      this.errors.push('Source secret is required.');
+        if (!this.sourceNamespace) this.errors.push('Source namespace is required.');
+        if (!this.sourceName)      this.errors.push('Source secret is required.');
       }
 
-      for (const [i, t] of (this.value.spec?.targets || []).entries()) {
+      for (const [i, t] of this.localTargets.entries()) {
         if (!t.namespace) {
           this.errors.push(`Target ${ i + 1 }: Namespace is required.`);
         }
-        if (t._selectorType === 'name' && !t.clusterName) {
+        if (t.selectorType === 'name' && !t.clusterName) {
           this.errors.push(`Target ${ i + 1 }: Cluster Name is required.`);
         }
-        if (t._selectorType === 'selector') {
-          this.parseSelectorLabels(t);
-          if (!t.clusterSelector) {
-            this.errors.push(`Target ${ i + 1 }: Label selector is required.`);
-          }
+        if (t.selectorType === 'selector' && !this.parseSelectorLabels(t.selectorLabels)) {
+          this.errors.push(`Target ${ i + 1 }: Label selector is required.`);
         }
       }
 
       return this.errors.length === 0;
+    },
+
+    // Build the clean spec from local form state, ready to write to value.
+    buildSpec() {
+      const targets = this.localTargets.map((t) => {
+        const entry = { namespace: t.namespace };
+
+        if (t.selectorType === 'name') {
+          entry.clusterName = t.clusterName;
+        } else {
+          entry.clusterSelector = this.parseSelectorLabels(t.selectorLabels);
+        }
+        if (t.secretName) entry.secretName = t.secretName;
+
+        return entry;
+      });
+
+      return {
+        secretRef: { name: this.sourceName, namespace: this.sourceNamespace },
+        targets,
+      };
     },
 
     async save(buttonCb) {
@@ -450,16 +465,6 @@ export default {
         return;
       }
 
-      // Strip UI-only fields from targets before sending to API
-      for (const t of this.value.spec.targets) {
-        delete t._selectorType;
-        delete t._selectorLabels;
-        if (!t.secretName)      delete t.secretName;
-        if (!t.clusterName)     delete t.clusterName;
-        if (!t.clusterSelector) delete t.clusterSelector;
-      }
-
-      // If the user chose to create a new secret, do that first
       if (this.sourceMode === 'create') {
         try {
           const secretObj = await this.$store.dispatch('cluster/create', {
@@ -469,23 +474,24 @@ export default {
           });
 
           await secretObj.save();
-          this.value.spec.secretRef = { name: this.newSecret.name, namespace: this.newSecret.namespace };
+          this.sourceNamespace = this.newSecret.namespace;
+          this.sourceName      = this.newSecret.name;
         } catch (e) {
           this.errors = [e?.data?.message || e.message || 'Failed to create secret.'];
-          this.initResource();
           buttonCb(false);
 
           return;
         }
       }
 
-      // Save the ManagedSecret itself
+      this.value.spec = this.buildSpec();
+
       try {
         await this.value.save();
         buttonCb(true);
       } catch (e) {
         this.errors = [e?.data?.message || e.message || 'Failed to save.'];
-        this.initResource();
+        this.initForm();
         buttonCb(false);
       }
     },
