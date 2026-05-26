@@ -92,6 +92,12 @@ jobs:
           mkdir -p "$PLUGIN_DIR"
           # dist-pkg folder is named <package>-<version>
           cp -r ui/dist-pkg/rancher-secrets-manager-${{ steps.ver.outputs.version }}/. "$PLUGIN_DIR/"
+          # Generate files.txt manifest required by Rancher's UI plugin caching system.
+          # Format: "<sha256> <relative-path>", one entry per file.
+          cd "$PLUGIN_DIR"
+          find . -type f | sort | while read -r f; do
+            sha256sum "$f" | awk '{sub(/^\.\//, "", $2); print $1, $2}'
+          done > files.txt
 
       - name: Regenerate Helm repo index
         run: |
