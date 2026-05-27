@@ -107,8 +107,21 @@ All settings are available in the Rancher Apps install form. The most commonly c
 |---|---|---|
 | `rancher.url` | `https://rancher.cattle-system` | Only if Rancher runs in a non-standard namespace or with a custom hostname |
 | `rancher.insecureTLS` | `false` | Local dev environments with self-signed certs |
-| `rancher.caBundle` | *(none)* | Rancher uses a private CA — provide the path to the PEM file mounted in the pod |
+| `rancher.caBundlePEM` | *(none)* | Rancher uses a private CA — provide the PEM certificate and the chart mounts it automatically. See below. |
 | `replicaCount` | `1` | Set to `2` for high-availability deployments |
+
+### Providing Rancher's CA certificate
+
+Standard Rancher installations use a self-signed CA (`dynamiclistener-ca`). Provide it at install time so the controller can verify TLS connections:
+
+```bash
+RANCHER_CA=$(kubectl get secret tls-rancher-internal-ca -n cattle-system \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d)
+
+helm upgrade --install rancher-secrets-manager rancher-secrets-manager/rancher-secrets-manager \
+  -n cattle-secrets-system --create-namespace \
+  --set rancher.caBundlePEM="${RANCHER_CA}"
+```
 
 ---
 

@@ -4,10 +4,8 @@ package rancher
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net/http"
 	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +49,6 @@ type Client struct {
 	dynamicClient dynamic.Interface
 	// token is the controller's service account token used to authenticate to Rancher.
 	token string
-	// tlsConfig is used when dialling the Rancher proxy endpoint.
-	tlsConfig *tls.Config
 }
 
 // NewClient creates a Client using the given Rancher config and the in-cluster REST config
@@ -68,16 +64,16 @@ func NewClient(cfg Config, restCfg *rest.Config) (*Client, error) {
 		return nil, fmt.Errorf("reading service account token: %w", err)
 	}
 
-	tlsCfg, err := buildTLSConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("building TLS config: %w", err)
+	if cfg.CABundlePath != "" {
+		if err := validateCABundle(cfg.CABundlePath); err != nil {
+			return nil, fmt.Errorf("CA bundle: %w", err)
+		}
 	}
 
 	return &Client{
 		cfg:           cfg,
 		dynamicClient: dyn,
 		token:         token,
-		tlsConfig:     tlsCfg,
 	}, nil
 }
 
@@ -130,14 +126,8 @@ func (c *Client) BuildClusterConfig(clusterID string) (*rest.Config, error) {
 		BearerToken: c.token,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: c.cfg.InsecureTLS,
+			CAFile:   c.cfg.CABundlePath,
 		},
-	}
-	if c.tlsConfig != nil && c.tlsConfig.RootCAs != nil {
-		cfg.TLSClientConfig.Insecure = false
-	}
-	// Attach the custom transport so the CA bundle is used.
-	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		return &http.Transport{TLSClientConfig: c.tlsConfig}
 	}
 	return cfg, nil
 }
@@ -214,22 +204,16 @@ func saToken() (string, error) {
 	return string(data), nil
 }
 
-func buildTLSConfig(cfg Config) (*tls.Config, error) {
-	tlsCfg := &tls.Config{
-		InsecureSkipVerify: cfg.InsecureTLS, //nolint:gosec
+func validateCABundle(path string) error {
+	pem, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading %q: %w", path, err)
 	}
-	if cfg.CABundlePath != "" {
-		pem, err := os.ReadFile(cfg.CABundlePath)
-		if err != nil {
-			return nil, fmt.Errorf("reading CA bundle %q: %w", cfg.CABundlePath, err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("no valid certificates found in %q", cfg.CABundlePath)
-		}
-		tlsCfg.RootCAs = pool
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(pem) {
+		return fmt.Errorf("no valid certificates found in %q", path)
 	}
-	return tlsCfg, nil
+	return nil
 }
 
 // labelsAsSet wraps a map so it satisfies labels.Labels for selector matching.
