@@ -94,9 +94,11 @@ The controller does **not** manage its own cluster credentials. Instead it proxi
 https://<rancher-service>/k8s/clusters/<cluster-id>/
 ```
 
-The controller's `ServiceAccount` token is used to authenticate to the Rancher API, which then forwards requests through the existing agent tunnel. This means no extra credential bootstrapping is needed on downstream clusters.
+**Authentication:** Rancher's proxy rejects plain Kubernetes ServiceAccount tokens — it requires a Rancher user token. The controller reads the token from the Fleet-managed kubeconfig secret at `fleet-default/<clusterID>-kubeconfig` (populated automatically by Rancher when a cluster is imported). If that secret doesn't exist (e.g. non-Fleet clusters), it falls back to the controller's SA token.
 
-The `pkg/rancher/` package wraps this: it lists `management.cattle.io/v3 Cluster` objects to resolve cluster selectors, then builds a per-cluster `rest.Config` that points at the proxy endpoint.
+**TLS:** `InsecureSkipVerify: true` is set for all Rancher proxy connections. Rancher's `dynamiclistener` CA uses an ECDSA encoding that Go 1.22+'s strict x509 verification rejects — even when the cert chain is structurally valid. Since this is internal cluster traffic to a known service endpoint, skipping verification is acceptable.
+
+The `pkg/rancher/` package wraps this: it lists `management.cattle.io/v3 Cluster` objects to resolve cluster selectors, then builds a per-cluster `rest.Config` via `configFromFleetKubeconfig` (or falls back to SA token).
 
 ### Controller reconcile loop
 
@@ -120,7 +122,7 @@ charts/rancher-secrets-manager/
 ├── templates/
 │   ├── deployment.yaml
 │   ├── serviceaccount.yaml
-│   ├── clusterrole.yaml        # needs get/list/watch on Clusters + Secrets
+│   ├── clusterrole.yaml        # get/list/watch on Clusters, Secrets (cluster-wide, covers fleet-default)
 │   └── clusterrolebinding.yaml
 └── values.yaml
 ```

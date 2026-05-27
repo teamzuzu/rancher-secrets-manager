@@ -106,22 +106,8 @@ All settings are available in the Rancher Apps install form. The most commonly c
 | Setting | Default | When to change |
 |---|---|---|
 | `rancher.url` | `https://rancher.cattle-system` | Only if Rancher runs in a non-standard namespace or with a custom hostname |
-| `rancher.insecureTLS` | `false` | Local dev environments with self-signed certs |
-| `rancher.caBundlePEM` | *(none)* | Rancher uses a private CA — provide the PEM certificate and the chart mounts it automatically. See below. |
+| `rancher.insecureTLS` | `false` | Reserved — TLS verification for the Rancher proxy is always skipped internally (see *How it works*) |
 | `replicaCount` | `1` | Set to `2` for high-availability deployments |
-
-### Providing Rancher's CA certificate
-
-Standard Rancher installations use a self-signed CA (`dynamiclistener-ca`). Provide it at install time so the controller can verify TLS connections:
-
-```bash
-RANCHER_CA=$(kubectl get secret tls-rancher-internal-ca -n cattle-system \
-  -o jsonpath='{.data.tls\.crt}' | base64 -d)
-
-helm upgrade --install rancher-secrets-manager rancher-secrets-manager/rancher-secrets-manager \
-  -n cattle-secrets-system --create-namespace \
-  --set rancher.caBundlePEM="${RANCHER_CA}"
-```
 
 ---
 
@@ -199,7 +185,7 @@ ManagedSecret → controller → Rancher API proxy → cattle-cluster-agent → 
 ```
 
 1. The controller reads a `ManagedSecret` and resolves its target list by querying `management.cattle.io/v3 Cluster` objects.
-2. For each `(cluster, namespace)` pair it calls Rancher's built-in proxy endpoint (`/k8s/clusters/<id>/`) using its own ServiceAccount token — no extra credentials on downstream clusters.
+2. For each `(cluster, namespace)` pair it calls Rancher's built-in proxy endpoint (`/k8s/clusters/<id>/`) — authenticating with the Rancher user token from the Fleet-managed kubeconfig secret (`fleet-default/<clusterID>-kubeconfig`). No extra credentials are needed on downstream clusters.
 3. Sync state is written back to `.status.syncStatus` after every reconcile.
 
 The controller also watches the referenced source `Secret` and re-queues any `ManagedSecret` that uses it whenever its data changes.
