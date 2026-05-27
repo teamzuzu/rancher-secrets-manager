@@ -33,7 +33,6 @@ func main() {
 		enableLeaderElection bool
 		rancherURL           string
 		insecureTLS          bool
-		caBundle             string
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "Metrics endpoint bind address.")
@@ -41,7 +40,6 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.StringVar(&rancherURL, "rancher-url", "", "Base URL of the Rancher API (e.g. https://rancher.cattle-system.svc).")
 	flag.BoolVar(&insecureTLS, "insecure-tls", false, "Skip TLS verification when connecting to Rancher. Use only in development.")
-	flag.StringVar(&caBundle, "ca-bundle", "", "Path to a PEM CA bundle to trust for the Rancher endpoint.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
@@ -71,9 +69,8 @@ func main() {
 	}
 
 	rancherClient, err := rancher.NewClient(rancher.Config{
-		RancherURL:   rancherURL,
-		InsecureTLS:  insecureTLS,
-		CABundlePath: caBundle,
+		RancherURL:  rancherURL,
+		InsecureTLS: insecureTLS,
 	}, mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "unable to create Rancher client")

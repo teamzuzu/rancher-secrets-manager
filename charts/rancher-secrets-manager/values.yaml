@@ -13,10 +13,6 @@ rancher:
   url: "https://rancher.cattle-system"
   # insecureTLS skips TLS verification. Use only in development.
   insecureTLS: false
-  # caBundlePEM is the PEM-encoded CA certificate to trust for the Rancher endpoint.
-  # When set, the chart creates a Secret and mounts it into the controller pod automatically.
-  # Obtain from: kubectl get secret tls-rancher-internal-ca -n cattle-system -o jsonpath='{.data.tls\.crt}' | base64 -d
-  caBundlePEM: ""
 
 leaderElection:
   enabled: true

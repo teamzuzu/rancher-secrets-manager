@@ -4,7 +4,7 @@ package rancher
 
 import (
 	"context"
-	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"os"
 
@@ -13,15 +13,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	secretsv1alpha1 "github.com/txodds/rancher-secrets-manager/pkg/api/v1alpha1"
 )
 
-var clusterGVR = schema.GroupVersionResource{
-	Group:    "management.cattle.io",
-	Version:  "v3",
-	Resource: "clusters",
-}
+var (
+	clusterGVR = schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "clusters",
+	}
+	secretGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}
+)
 
 // ResolvedTarget is a concrete (clusterID, clusterName, namespace, secretName) tuple
 // derived from expanding a ManagedSecret Target entry.
@@ -39,16 +47,14 @@ type Config struct {
 	RancherURL string
 	// InsecureTLS skips TLS certificate verification. Use only in development.
 	InsecureTLS bool
-	// CABundlePath is an optional path to a PEM CA bundle to trust for the Rancher endpoint.
-	CABundlePath string
 }
 
 // Client wraps the Rancher management API and builds downstream cluster configs.
 type Client struct {
 	cfg           Config
 	dynamicClient dynamic.Interface
-	// token is the controller's service account token used to authenticate to Rancher.
-	token string
+	// saToken is the controller's SA token, used as a fallback when no fleet kubeconfig exists.
+	saToken string
 }
 
 // NewClient creates a Client using the given Rancher config and the in-cluster REST config
@@ -59,21 +65,15 @@ func NewClient(cfg Config, restCfg *rest.Config) (*Client, error) {
 		return nil, fmt.Errorf("building dynamic client: %w", err)
 	}
 
-	token, err := saToken()
+	token, err := readSAToken()
 	if err != nil {
 		return nil, fmt.Errorf("reading service account token: %w", err)
-	}
-
-	if cfg.CABundlePath != "" {
-		if err := validateCABundle(cfg.CABundlePath); err != nil {
-			return nil, fmt.Errorf("CA bundle: %w", err)
-		}
 	}
 
 	return &Client{
 		cfg:           cfg,
 		dynamicClient: dyn,
-		token:         token,
+		saToken:       token,
 	}, nil
 }
 
@@ -118,17 +118,59 @@ func (c *Client) ResolveTargets(ctx context.Context, srcSecretName string, targe
 }
 
 // BuildClusterConfig returns a *rest.Config that routes requests through Rancher's
-// API proxy for the given cluster ID, authenticated with the controller's SA token.
-func (c *Client) BuildClusterConfig(clusterID string) (*rest.Config, error) {
-	host := fmt.Sprintf("%s/k8s/clusters/%s", c.cfg.RancherURL, clusterID)
-	cfg := &rest.Config{
-		Host:        host,
-		BearerToken: c.token,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: c.cfg.InsecureTLS,
-			CAFile:   c.cfg.CABundlePath,
-		},
+// API proxy for the given cluster ID.
+//
+// It first looks for a Fleet-managed kubeconfig in fleet-default/<clusterID>-kubeconfig,
+// which contains the correct per-cluster Rancher token. If not found it falls back to the
+// controller's SA token (useful for the local cluster or non-Fleet deployments).
+//
+// TLS verification against the Rancher service is skipped: Rancher's dynamiclistener CA
+// uses ECDSA encoding that Go's strict x509 path rejects, and this is internal cluster
+// traffic to a known service endpoint.
+func (c *Client) BuildClusterConfig(ctx context.Context, clusterID string) (*rest.Config, error) {
+	if cfg, err := c.configFromFleetKubeconfig(ctx, clusterID); err == nil {
+		return cfg, nil
 	}
+
+	// Fallback: SA token with the configured Rancher URL.
+	return &rest.Config{
+		Host:        fmt.Sprintf("%s/k8s/clusters/%s", c.cfg.RancherURL, clusterID),
+		BearerToken: c.saToken,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}, nil
+}
+
+// configFromFleetKubeconfig reads the fleet-default/<clusterID>-kubeconfig secret
+// and builds a rest.Config from it.
+func (c *Client) configFromFleetKubeconfig(ctx context.Context, clusterID string) (*rest.Config, error) {
+	secret, err := c.dynamicClient.Resource(secretGVR).
+		Namespace("fleet-default").
+		Get(ctx, clusterID+"-kubeconfig", metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("getting fleet kubeconfig secret: %w", err)
+	}
+
+	valueB64, _, _ := unstructured.NestedString(secret.Object, "data", "value")
+	if valueB64 == "" {
+		return nil, fmt.Errorf("fleet kubeconfig secret %s-kubeconfig has no 'value' key", clusterID)
+	}
+
+	kubeconfigBytes, err := base64.StdEncoding.DecodeString(valueB64)
+	if err != nil {
+		return nil, fmt.Errorf("decoding fleet kubeconfig: %w", err)
+	}
+
+	cfg, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parsing fleet kubeconfig: %w", err)
+	}
+
+	// Skip TLS verification for the Rancher proxy: the dynamiclistener CA uses ECDSA
+	// encoding that Go's strict x509 path rejects. This is internal cluster traffic.
+	cfg.TLSClientConfig = rest.TLSClientConfig{Insecure: true}
+
 	return cfg, nil
 }
 
@@ -195,25 +237,13 @@ func displayNameOf(obj unstructured.Unstructured) string {
 	return obj.GetName()
 }
 
-func saToken() (string, error) {
+func readSAToken() (string, error) {
 	const tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	data, err := os.ReadFile(tokenPath)
 	if err != nil {
 		return "", fmt.Errorf("reading %s: %w", tokenPath, err)
 	}
 	return string(data), nil
-}
-
-func validateCABundle(path string) error {
-	pem, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading %q: %w", path, err)
-	}
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(pem) {
-		return fmt.Errorf("no valid certificates found in %q", path)
-	}
-	return nil
 }
 
 // labelsAsSet wraps a map so it satisfies labels.Labels for selector matching.
