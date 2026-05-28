@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	requeueAfter     = 5 * time.Minute
+	requeueAfter     = 30 * time.Second
 	labelManagedBy   = "secrets.cattle.io/managed-by"
 	annotationSource = "secrets.cattle.io/source-managed-secret"
 )
