@@ -68,7 +68,7 @@ kubectl create secret generic my-api-key \
   --from-literal=token='abc123'
 ```
 
-Then open **Secrets Manager** in the Rancher dashboard and click **Create**.  
+Then open **Secrets Manager** in the Rancher dashboard and click **Create**. Enter a name for the managed secret, select the source secret, configure your targets, and click **Create**.  
 Or apply YAML directly:
 
 ```yaml
@@ -187,6 +187,7 @@ ManagedSecret → controller → Rancher API proxy → cattle-cluster-agent → 
 1. The controller reads a `ManagedSecret` and resolves its target list by querying `management.cattle.io/v3 Cluster` objects.
 2. For each `(cluster, namespace)` pair it calls Rancher's built-in proxy endpoint (`/k8s/clusters/<id>/`) — authenticating with the Rancher user token from the Fleet-managed kubeconfig secret (`fleet-default/<clusterID>-kubeconfig`). No extra credentials are needed on downstream clusters.
 3. Sync state is written back to `.status.syncStatus` after every reconcile.
+4. The controller re-queues every **30 seconds**. If a synced downstream secret is deleted or modified outside the controller, it is automatically corrected within that window.
 
 The controller also watches the referenced source `Secret` and re-queues any `ManagedSecret` that uses it whenever its data changes.
 
