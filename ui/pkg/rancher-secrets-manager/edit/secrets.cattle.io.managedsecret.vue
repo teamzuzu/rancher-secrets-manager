@@ -8,6 +8,21 @@
     @finish="save"
     @error="(e) => errors = e"
   >
+    <!-- ── Name ──────────────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="row mb-10">
+        <div class="col span-6">
+          <LabeledInput
+            v-model:value="resourceName"
+            label="Name"
+            :mode="mode === 'create' ? 'create' : 'view'"
+            placeholder="e.g. my-api-key"
+            required
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- ── Source Secret ─────────────────────────────────────────────── -->
     <div class="section">
       <h3>Source Secret</h3>
@@ -259,6 +274,7 @@ export default {
   data() {
     return {
       errors:          [],
+      resourceName:    '',
       sourceMode:      'existing',
       sourceNamespace: '',
       sourceName:      '',
@@ -337,6 +353,8 @@ export default {
 
     // Populate local form state from value (called on create and after a failed save).
     initForm() {
+      this.resourceName = this.value.metadata?.name || '';
+
       const spec = this.value.spec || {};
       const ref  = spec.secretRef || {};
 
@@ -411,6 +429,10 @@ export default {
     willSave() {
       this.errors = [];
 
+      if (this.mode === 'create' && !this.resourceName) {
+        this.errors.push('Name is required.');
+      }
+
       if (this.sourceMode === 'create') {
         if (!this.newSecret.name)      this.errors.push('New secret name is required.');
         if (!this.newSecret.namespace) this.errors.push('New secret namespace is required.');
@@ -484,6 +506,9 @@ export default {
         }
       }
 
+      if (this.mode === 'create') {
+        this.value.metadata.name = this.resourceName;
+      }
       this.value.spec = this.buildSpec();
 
       try {

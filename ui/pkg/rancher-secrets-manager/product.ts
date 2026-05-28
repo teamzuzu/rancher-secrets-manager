@@ -20,8 +20,8 @@ export function init($plugin: any, store: any) {
     isCreatable: true,
     isEditable:  true,
     isRemovable: true,
-    showAge:     true,
-    showState:   true,
+    showAge:     false,
+    showState:   false,
     canYaml:     true,
   });
 
