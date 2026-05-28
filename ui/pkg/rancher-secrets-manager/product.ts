@@ -5,9 +5,10 @@ export function init($plugin: any, store: any) {
   const { product, configureType, basicType } = $plugin.DSL(store, PRODUCT_NAME);
 
   product({
-    icon:    'lock',
-    inStore: 'cluster',
-    weight:  100,
+    icon:         'lock',
+    inStore:      'cluster',
+    weight:       80,
+    ifHaveGroup:  'secrets.cattle.io',
     to: {
       name:   `${ PRODUCT_NAME }-c-cluster-resource`,
       params: { product: PRODUCT_NAME, cluster: 'local', resource: RESOURCE },
