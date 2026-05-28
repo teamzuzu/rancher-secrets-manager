@@ -103,7 +103,7 @@ The `pkg/rancher/` package wraps this: it lists `management.cattle.io/v3 Cluster
 ### Controller reconcile loop
 
 ```
-ManagedSecret changed
+ManagedSecret changed  (or source Secret changed, or 30s requeue fires)
   → resolve target clusters (list Clusters, apply selector)
   → for each (cluster, namespace):
       → build downstream rest.Config (Rancher proxy)
@@ -112,7 +112,7 @@ ManagedSecret changed
   → update ManagedSecret status
 ```
 
-The controller also watches the referenced source `Secret` and re-queues any `ManagedSecret` that references it when it changes.
+The controller re-queues every **30 seconds** for drift detection — if a synced downstream secret is deleted or modified outside the controller it is corrected within that window. It also watches the referenced source `Secret` and immediately re-queues any `ManagedSecret` that references it when its data changes.
 
 ### Helm chart layout
 
