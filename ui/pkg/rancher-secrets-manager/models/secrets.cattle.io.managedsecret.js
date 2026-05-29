@@ -1,43 +1,43 @@
-export default {
-  computed: {
-    sourceSecretDisplay() {
-      const ref = this.spec?.secretRef;
+import SteveModel from '@shell/plugins/steve/steve-class';
 
-      return ref ? `${ ref.namespace }/${ ref.name }` : '';
-    },
+export default class ManagedSecret extends SteveModel {
+  get sourceSecretDisplay() {
+    const ref = this.spec?.secretRef;
 
-    targetCount() {
-      return this.status?.targetCount || 0;
-    },
+    return ref ? `${ ref.namespace }/${ ref.name }` : '';
+  }
 
-    syncedCount() {
-      return this.status?.syncedCount || 0;
-    },
+  get targetCount() {
+    return this.status?.targetCount || 0;
+  }
 
-    syncState() {
-      const total  = this.targetCount;
-      const synced = this.syncedCount;
+  get syncedCount() {
+    return this.status?.syncedCount || 0;
+  }
 
-      if (!total)          return 'Pending';
-      if (synced === total) return 'Synced';
-      if (synced === 0)     return 'Failed';
+  get syncState() {
+    const total  = this.targetCount;
+    const synced = this.syncedCount;
 
-      return 'Partial';
-    },
+    if (!total)           return 'Pending';
+    if (synced === total) return 'Synced';
+    if (synced === 0)     return 'Failed';
 
-    stateLabel() {
-      return this.syncState;
-    },
+    return 'Partial';
+  }
 
-    stateColor() {
-      const map = {
-        Synced:  'text-success',
-        Failed:  'text-error',
-        Partial: 'text-warning',
-        Pending: 'text-info',
-      };
+  get stateLabel() {
+    return this.syncState;
+  }
 
-      return map[this.syncState] || 'text-info';
-    },
-  },
-};
+  get stateColor() {
+    const map = {
+      Synced:  'text-success',
+      Failed:  'text-error',
+      Partial: 'text-warning',
+      Pending: 'text-info',
+    };
+
+    return map[this.syncState] || 'text-info';
+  }
+}
