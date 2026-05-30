@@ -120,16 +120,25 @@ func (c *Client) ResolveTargets(ctx context.Context, srcSecretName string, targe
 // BuildClusterConfig returns a *rest.Config that routes requests through Rancher's
 // API proxy for the given cluster ID.
 //
-// It first looks for a Fleet-managed kubeconfig in fleet-default/<clusterID>-kubeconfig,
-// which contains the correct per-cluster Rancher token. If not found it falls back to the
-// controller's SA token (useful for the local cluster or non-Fleet deployments).
+// It looks for a Fleet-managed kubeconfig secret in fleet-default/, trying two naming
+// conventions in order:
+//   - <clusterID>-kubeconfig  (standard clusters, e.g. c-dqh2m-kubeconfig)
+//   - <displayName>-kubeconfig (CAPI-provisioned clusters, e.g. oci-kubeconfig)
+//
+// If neither exists it falls back to the controller's SA token.
 //
 // TLS verification against the Rancher service is skipped: Rancher's dynamiclistener CA
 // uses ECDSA encoding that Go's strict x509 path rejects, and this is internal cluster
 // traffic to a known service endpoint.
-func (c *Client) BuildClusterConfig(ctx context.Context, clusterID string) (*rest.Config, error) {
-	if cfg, err := c.configFromFleetKubeconfig(ctx, clusterID); err == nil {
+func (c *Client) BuildClusterConfig(ctx context.Context, clusterID, displayName string) (*rest.Config, error) {
+	if cfg, err := c.configFromFleetKubeconfig(ctx, clusterID+"-kubeconfig"); err == nil {
 		return cfg, nil
+	}
+	// CAPI-provisioned clusters (c-m-* IDs) name their secret after the display name.
+	if displayName != "" && displayName != clusterID {
+		if cfg, err := c.configFromFleetKubeconfig(ctx, displayName+"-kubeconfig"); err == nil {
+			return cfg, nil
+		}
 	}
 
 	// Fallback: SA token with the configured Rancher URL.
@@ -142,19 +151,18 @@ func (c *Client) BuildClusterConfig(ctx context.Context, clusterID string) (*res
 	}, nil
 }
 
-// configFromFleetKubeconfig reads the fleet-default/<clusterID>-kubeconfig secret
-// and builds a rest.Config from it.
-func (c *Client) configFromFleetKubeconfig(ctx context.Context, clusterID string) (*rest.Config, error) {
+// configFromFleetKubeconfig reads the named secret from fleet-default and builds a rest.Config from it.
+func (c *Client) configFromFleetKubeconfig(ctx context.Context, secretName string) (*rest.Config, error) {
 	secret, err := c.dynamicClient.Resource(secretGVR).
 		Namespace("fleet-default").
-		Get(ctx, clusterID+"-kubeconfig", metav1.GetOptions{})
+		Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("getting fleet kubeconfig secret: %w", err)
 	}
 
 	valueB64, _, _ := unstructured.NestedString(secret.Object, "data", "value")
 	if valueB64 == "" {
-		return nil, fmt.Errorf("fleet kubeconfig secret %s-kubeconfig has no 'value' key", clusterID)
+		return nil, fmt.Errorf("fleet kubeconfig secret %s has no 'value' key", secretName)
 	}
 
 	kubeconfigBytes, err := base64.StdEncoding.DecodeString(valueB64)
