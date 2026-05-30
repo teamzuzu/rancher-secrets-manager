@@ -106,7 +106,7 @@ func (r *Reconciler) syncToCluster(
 		Status:      secretsv1alpha1.SyncStatePending,
 	}
 
-	clusterCfg, err := r.RancherClient.BuildClusterConfig(ctx, target.ClusterID)
+	clusterCfg, err := r.RancherClient.BuildClusterConfig(ctx, target.ClusterID, target.ClusterName)
 	if err != nil {
 		status.Status = secretsv1alpha1.SyncStateFailed
 		status.Message = fmt.Sprintf("building cluster config: %v", err)
