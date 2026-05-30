@@ -207,11 +207,12 @@
             v-if="target.selectorType === 'name'"
             class="col span-8"
           >
-            <LabeledInput
+            <LabeledSelect
               v-model:value="target.clusterName"
               label="Cluster Name"
+              :options="clusterOptions"
+              :loading="loadingMeta"
               :mode="mode"
-              placeholder="e.g. production-eu"
               required
             />
           </div>
@@ -282,6 +283,7 @@ export default {
       namespaces:      [],
       allSecrets:      [],
       loadingMeta:     false,
+      managedClusters: [],
 
       newSecret: {
         name:      '',
@@ -299,6 +301,15 @@ export default {
   computed: {
     isView() {
       return this.mode === 'view';
+    },
+
+    clusterOptions() {
+      return this.managedClusters
+        .filter(c => c.metadata?.name !== 'local')
+        .map(c => c.spec?.displayName || c.metadata?.name)
+        .filter(Boolean)
+        .sort()
+        .map(n => ({ label: n, value: n }));
     },
 
     namespaceOptions() {
@@ -353,9 +364,10 @@ export default {
     async fetchMeta() {
       this.loadingMeta = true;
       try {
-        [this.namespaces, this.allSecrets] = await Promise.all([
+        [this.namespaces, this.allSecrets, this.managedClusters] = await Promise.all([
           this.$store.dispatch('cluster/findAll', { type: 'namespace' }),
           this.$store.dispatch('cluster/findAll', { type: 'secret' }),
+          this.$store.dispatch('management/findAll', { type: 'management.cattle.io.cluster' }),
         ]);
       } catch {
         // Graceful degradation — selects will be empty but form still works
