@@ -302,9 +302,22 @@ export default {
     },
 
     namespaceOptions() {
+      const ALWAYS_INCLUDE = new Set(['cattle-secrets-system', 'default']);
+      const SYSTEM_PREFIXES = ['kube-', 'cattle-', 'fleet-', 'cluster-', 'user-'];
+
       return this.namespaces
+        .filter((ns) => {
+          const name = ns.metadata?.name || ns.name;
+
+          if (!name) return false;
+          if (ALWAYS_INCLUDE.has(name)) return true;
+          if (ns.metadata?.annotations?.['management.cattle.io/system-namespace'] === 'true') return false;
+          if (name === 'local') return false;
+          if (SYSTEM_PREFIXES.some(p => name.startsWith(p))) return false;
+
+          return true;
+        })
         .map(ns => ns.metadata?.name || ns.name)
-        .filter(Boolean)
         .sort()
         .map(n => ({ label: n, value: n }));
     },
