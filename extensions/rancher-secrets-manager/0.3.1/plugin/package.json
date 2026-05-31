@@ -1,0 +1,19 @@
+{
+  "name": "rancher-secrets-manager",
+  "description": "Sync secrets from the Rancher management cluster to downstream clusters",
+  "version": "0.3.1",
+  "keywords": [
+    "rancher",
+    "secrets",
+    "extension"
+  ],
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-plugin-typescript": "~5.0.0"
+  },
+  "rancher": true,
+  "files": [
+    "**/*"
+  ],
+  "main": "rancher-secrets-manager-0.3.1.umd.min.js"
+}
