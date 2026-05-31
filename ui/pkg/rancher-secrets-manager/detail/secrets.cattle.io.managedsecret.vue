@@ -26,13 +26,17 @@
 
           <div class="detail-section">
             <h3>Sync Summary</h3>
+            <div v-if="value.spec?.paused" class="paused-banner mb-10">
+              <span class="badge bg-muted">Paused</span>
+              Syncing is suspended — downstream secrets are not being updated.
+            </div>
             <div class="detail-row">
               <span class="detail-label">Total Targets</span>
-              <span>{{ value.status.targetCount || 0 }}</span>
+              <span>{{ value.status?.targetCount || 0 }}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Synced</span>
-              <span>{{ value.status.syncedCount || 0 }}</span>
+              <span>{{ value.status?.syncedCount || 0 }}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Overall Status</span>
@@ -140,6 +144,7 @@ export default {
         Failed:  'bg-error',
         Partial: 'bg-warning',
         Pending: 'bg-info',
+        Paused:  'bg-muted',
       };
 
       return map[this.value.syncState] || 'bg-info';
@@ -243,5 +248,17 @@ export default {
   padding: 20px;
   text-align: center;
   opacity: 0.6;
+}
+
+.paused-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  opacity: 0.8;
 }
 </style>

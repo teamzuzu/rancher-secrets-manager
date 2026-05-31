@@ -251,6 +251,20 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Pause ─────────────────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Sync Control</h3>
+      <Checkbox
+        v-model:value="paused"
+        label="Pause syncing"
+        :mode="mode"
+      />
+      <p class="hint mt-5">
+        When paused, the controller stops syncing this secret. Secrets already
+        synced to downstream clusters are left untouched.
+      </p>
+    </div>
   </CruResource>
 </template>
 
@@ -258,12 +272,13 @@
 import CruResource    from '@shell/components/CruResource';
 import LabeledInput   from '@shell/rancher-components/Form/LabeledInput/LabeledInput';
 import LabeledSelect  from '@shell/components/form/LabeledSelect';
+import Checkbox       from '@shell/rancher-components/Form/Checkbox/Checkbox';
 import CreateEditView from '@shell/mixins/create-edit-view';
 
 export default {
   name: 'ManagedSecretEdit',
 
-  components: { CruResource, LabeledInput, LabeledSelect },
+  components: { CruResource, LabeledInput, LabeledSelect, Checkbox },
 
   mixins: [CreateEditView],
 
@@ -284,6 +299,7 @@ export default {
       allSecrets:      [],
       loadingMeta:     false,
       managedClusters: [],
+      paused:          false,
 
       newSecret: {
         name:      '',
@@ -385,6 +401,7 @@ export default {
 
       this.sourceNamespace = ref.namespace || '';
       this.sourceName      = ref.name      || '';
+      this.paused          = !!spec.paused;
 
       const srcTargets = spec.targets?.length ? spec.targets : [this.blankTarget()];
 
@@ -499,10 +516,14 @@ export default {
         return entry;
       });
 
-      return {
+      const spec = {
         secretRef: { name: this.sourceName, namespace: this.sourceNamespace },
         targets,
       };
+
+      if (this.paused) spec.paused = true;
+
+      return spec;
     },
 
     async save(buttonCb) {
