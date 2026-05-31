@@ -49,6 +49,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Paused: skip all sync work, leave existing downstream secrets untouched.
+	if ms.Spec.Paused {
+		ms.Status.Conditions = []metav1.Condition{{
+			Type:               "Ready",
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: ms.Generation,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Paused",
+			Message:            "Syncing is paused",
+		}}
+		_ = r.Status().Update(ctx, &ms)
+		return ctrl.Result{}, nil // no timer requeue; re-triggered by spec change
+	}
+
 	// Fetch the source secret from the management cluster.
 	var srcSecret corev1.Secret
 	srcKey := types.NamespacedName{Name: ms.Spec.SecretRef.Name, Namespace: ms.Spec.SecretRef.Namespace}

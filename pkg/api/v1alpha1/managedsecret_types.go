@@ -27,6 +27,12 @@ type ManagedSecretSpec struct {
 	// Targets defines which downstream clusters and namespaces receive the secret.
 	// +kubebuilder:validation:MinItems=1
 	Targets []Target `json:"targets"`
+
+	// Paused suspends all sync operations when true. Secrets already synced to
+	// downstream clusters are left in place; they are not deleted or modified
+	// until syncing is resumed.
+	// +optional
+	Paused bool `json:"paused,omitempty"`
 }
 
 type SecretReference struct {

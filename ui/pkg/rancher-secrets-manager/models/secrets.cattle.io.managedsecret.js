@@ -15,7 +15,13 @@ export default class ManagedSecret extends SteveModel {
     return this.status?.syncedCount || 0;
   }
 
+  get isPaused() {
+    return !!this.spec?.paused;
+  }
+
   get syncState() {
+    if (this.isPaused)    return 'Paused';
+
     const total  = this.targetCount;
     const synced = this.syncedCount;
 
