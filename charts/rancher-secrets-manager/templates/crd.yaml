@@ -4,6 +4,10 @@ metadata:
   name: managedsecrets.secrets.cattle.io
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
+    meta.helm.sh/release-name: rancher-secrets-manager
+    meta.helm.sh/release-namespace: cattle-secrets-system
+  labels:
+    app.kubernetes.io/managed-by: Helm
 spec:
   group: secrets.cattle.io
   names:
