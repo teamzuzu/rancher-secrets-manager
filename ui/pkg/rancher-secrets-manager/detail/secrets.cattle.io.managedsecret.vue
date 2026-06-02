@@ -27,7 +27,7 @@
           <div class="detail-section">
             <h3>Sync Summary</h3>
             <div v-if="value.spec?.paused" class="paused-banner mb-10">
-              <span class="badge bg-muted">Paused</span>
+              <span class="badge bg-disabled">Paused</span>
               Syncing is suspended — downstream secrets are not being updated.
             </div>
             <div class="detail-row">
@@ -144,7 +144,7 @@ export default {
         Failed:  'bg-error',
         Partial: 'bg-warning',
         Pending: 'bg-info',
-        Paused:  'bg-muted',
+        Paused:  'bg-disabled',
       };
 
       return map[this.value.syncState] || 'bg-info';
