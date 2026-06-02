@@ -84,7 +84,7 @@ export default {
         Failed:  'bg-error',
         Partial: 'bg-warning',
         Pending: 'bg-info',
-        Paused:  'bg-muted',
+        Paused:  'bg-disabled',
       };
 
       return map[row.syncState] || 'bg-info';
