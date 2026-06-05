@@ -33,6 +33,7 @@ manifests: controller-gen
 	$(CONTROLLER_GEN) crd rbac:roleName=rancher-secrets-manager-role webhook paths="./..." \
 		output:crd:artifacts:config=charts/rancher-secrets-manager/crds \
 		output:rbac:artifacts:config=config/rbac
+	cp charts/rancher-secrets-manager/crds/*.yaml charts/rancher-secrets-manager/templates/crd.yaml
 
 ## Build the Docker image.
 docker-build:
@@ -44,11 +45,11 @@ docker-push:
 
 ## Install CRDs into the current cluster.
 install: manifests
-	kubectl apply -f charts/rancher-secrets-manager/crds/
+	kubectl apply -f charts/rancher-secrets-manager/templates/crd.yaml
 
 ## Uninstall CRDs from the current cluster.
 uninstall:
-	kubectl delete -f charts/rancher-secrets-manager/crds/ --ignore-not-found
+	kubectl delete -f charts/rancher-secrets-manager/templates/crd.yaml --ignore-not-found
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 

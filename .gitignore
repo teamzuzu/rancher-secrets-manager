@@ -1,5 +1,6 @@
 bin/
 vendor/
+charts/rancher-secrets-manager/crds/
 *.test
 *.out
 .DS_Store
