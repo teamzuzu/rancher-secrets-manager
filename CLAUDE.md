@@ -45,8 +45,8 @@ helm template rancher-secrets-manager charts/rancher-secrets-manager --debug
 helm install rancher-secrets-manager charts/rancher-secrets-manager \
   -n cattle-secrets-system --create-namespace
 
-# Install CRDs only
-kubectl apply -f charts/rancher-secrets-manager/crds/
+# Apply CRD directly (the CRD lives in templates/ so helm upgrade handles it automatically)
+kubectl apply -f charts/rancher-secrets-manager/templates/crd.yaml
 ```
 
 ### Dev / CI Environment
@@ -83,6 +83,7 @@ yarn lint         # eslint
 `ManagedSecret` (`secrets.cattle.io/v1alpha1`) is the central CRD. It lives in the management cluster and describes:
 - A `secretRef` pointing to a source Kubernetes `Secret` in the management cluster
 - A `targets` list where each entry specifies a downstream cluster (by name or label selector) **and** the namespace to create the secret in on that cluster
+- An optional `paused` boolean (default `false`) — when `true`, the controller stops syncing without deleting downstream secrets
 
 The controller copies the source secret's `data` into a native `Secret` on each targeted downstream cluster and tracks sync state per-cluster in `.status.syncStatus`.
 
@@ -94,7 +95,7 @@ The controller does **not** manage its own cluster credentials. Instead it proxi
 https://<rancher-service>/k8s/clusters/<cluster-id>/
 ```
 
-**Authentication:** Rancher's proxy rejects plain Kubernetes ServiceAccount tokens — it requires a Rancher user token. The controller reads the token from the Fleet-managed kubeconfig secret at `fleet-default/<clusterID>-kubeconfig` (populated automatically by Rancher when a cluster is imported). If that secret doesn't exist (e.g. non-Fleet clusters), it falls back to the controller's SA token.
+**Authentication:** Rancher's proxy rejects plain Kubernetes ServiceAccount tokens — it requires a Rancher user token. The controller reads the token from the Fleet-managed kubeconfig secret at `fleet-default/<clusterID>-kubeconfig` (populated automatically by Rancher when a cluster is imported). For CAPI-provisioned clusters the secret may use the display name instead of the cluster ID, so the controller also tries `fleet-default/<displayName>-kubeconfig` as a fallback. If neither secret exists (e.g. non-Fleet clusters), it falls back to the controller's SA token.
 
 **TLS:** `InsecureSkipVerify: true` is set for all Rancher proxy connections. Rancher's `dynamiclistener` CA uses an ECDSA encoding that Go 1.22+'s strict x509 verification rejects — even when the cert chain is structurally valid. Since this is internal cluster traffic to a known service endpoint, skipping verification is acceptable.
 
@@ -104,6 +105,7 @@ The `pkg/rancher/` package wraps this: it lists `management.cattle.io/v3 Cluster
 
 ```
 ManagedSecret changed  (or source Secret changed, or 30s requeue fires)
+  → if spec.paused == true: update status to Paused, stop (no requeue timer)
   → resolve target clusters (list Clusters, apply selector)
   → for each (cluster, namespace):
       → build downstream rest.Config (Rancher proxy)
@@ -118,14 +120,16 @@ The controller re-queues every **30 seconds** for drift detection — if a synce
 
 ```
 charts/rancher-secrets-manager/
-├── crds/               # CRD YAML (installed before templates)
 ├── templates/
+│   ├── crd.yaml                # CRD managed as a template so helm upgrade applies schema changes
 │   ├── deployment.yaml
 │   ├── serviceaccount.yaml
 │   ├── clusterrole.yaml        # get/list/watch on Clusters, Secrets (cluster-wide, covers fleet-default)
 │   └── clusterrolebinding.yaml
 └── values.yaml
 ```
+
+Note: the CRD lives in `templates/` (not `crds/`) so that `helm upgrade` applies schema changes. Helm only installs files from `crds/` on first install and never updates them.
 
 The controller runs in the `cattle-secrets-system` namespace by default.
 
