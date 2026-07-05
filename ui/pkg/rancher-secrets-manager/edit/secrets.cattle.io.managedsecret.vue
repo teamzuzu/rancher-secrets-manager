@@ -150,14 +150,28 @@
           </div>
         </div>
 
-        <button
+        <div
           v-if="!isView"
-          type="button"
-          class="btn btn-sm role-tertiary mt-5"
-          @click="addEntry"
+          class="kv-actions mt-5"
         >
-          + Add Key
-        </button>
+          <button
+            type="button"
+            class="btn btn-sm role-tertiary"
+            @click="addEntry"
+          >
+            + Add Key
+          </button>
+          <FileSelector
+            class="btn-sm role-tertiary"
+            label="Read from File"
+            :mode="mode"
+            multiple
+            include-file-name
+            @selected="onFilesSelected"
+            @error="onFileError"
+          />
+          <span class="hint file-hint">Each file becomes a key (filename) with the file contents as its value.</span>
+        </div>
       </template>
     </div>
 
@@ -273,12 +287,13 @@ import CruResource    from '@shell/components/CruResource';
 import LabeledInput   from '@shell/rancher-components/Form/LabeledInput/LabeledInput';
 import LabeledSelect  from '@shell/components/form/LabeledSelect';
 import Checkbox       from '@shell/rancher-components/Form/Checkbox/Checkbox';
+import FileSelector   from '@shell/components/form/FileSelector';
 import CreateEditView from '@shell/mixins/create-edit-view';
 
 export default {
   name: 'ManagedSecretEdit',
 
-  components: { CruResource, LabeledInput, LabeledSelect, Checkbox },
+  components: { CruResource, LabeledInput, LabeledSelect, Checkbox, FileSelector },
 
   mixins: [CreateEditView],
 
@@ -468,6 +483,36 @@ export default {
       this.newSecret.entries.splice(idx, 1);
     },
 
+    // FileSelector emits an array of { value, name } (or a single object when one file
+    // is picked). Each file becomes an entry keyed by a sanitised filename.
+    onFilesSelected(selected) {
+      const files = Array.isArray(selected) ? selected : [selected];
+
+      const newEntries = files
+        .filter(f => f && f.name)
+        .map(f => ({
+          key:       this.sanitiseKey(f.name),
+          value:     f.value ?? '',
+          showValue: false,
+        }));
+
+      if (!newEntries.length) return;
+
+      // Drop the leading blank placeholder entry so uploads don't leave an empty row.
+      const existing = this.newSecret.entries.filter(e => e.key || e.value);
+
+      this.newSecret.entries = [...existing, ...newEntries];
+    },
+
+    onFileError(err) {
+      this.errors = [typeof err === 'string' ? err : (err?.message || 'Failed to read file.')];
+    },
+
+    // Kubernetes secret keys must match [-._a-zA-Z0-9]+.
+    sanitiseKey(name) {
+      return name.replace(/[^-._a-zA-Z0-9]/g, '_');
+    },
+
     willSave() {
       this.errors = [];
 
@@ -645,6 +690,17 @@ export default {
   display: flex;
   align-items: flex-end;
   padding-bottom: 2px;
+}
+
+.kv-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.file-hint {
+  margin-top: 0;
 }
 
 /* Targets */
