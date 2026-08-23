@@ -605,6 +605,7 @@ export default {
       try {
         await this.value.save();
         buttonCb(true);
+        this.done();
       } catch (e) {
         this.errors = [e?.data?.message || e.message || 'Failed to save.'];
         this.initForm();
