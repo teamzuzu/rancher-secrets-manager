@@ -17,6 +17,7 @@
             label="Name"
             :mode="mode === 'create' ? 'create' : 'view'"
             placeholder="e.g. my-api-key"
+            :status="invalid(mode === 'create' && !resourceName)"
             required
           />
         </div>
@@ -56,6 +57,7 @@
               :options="namespaceOptions"
               :loading="loadingMeta"
               :mode="mode"
+              :status="invalid(!sourceNamespace)"
               required
               @update:value="sourceName = ''"
             />
@@ -68,6 +70,7 @@
               :loading="loadingMeta"
               :disabled="!sourceNamespace"
               :mode="mode"
+              :status="invalid(!sourceName)"
               required
             />
           </div>
@@ -86,6 +89,7 @@
               label="Secret Name"
               :mode="mode"
               placeholder="e.g. my-api-key"
+              :status="invalid(!newSecret.name)"
               required
             />
           </div>
@@ -96,6 +100,7 @@
               :options="namespaceOptions"
               :loading="loadingMeta"
               :mode="mode"
+              :status="invalid(!newSecret.namespace)"
               required
             />
           </div>
@@ -172,6 +177,10 @@
           />
           <span class="hint file-hint">Each file becomes a key (filename) with the file contents as its value.</span>
         </div>
+
+        <p v-if="invalid(!Object.keys(newSecretData).length)" class="hint error-hint">
+          Add at least one key–value entry.
+        </p>
       </template>
     </div>
 
@@ -227,6 +236,7 @@
               :options="clusterOptions"
               :loading="loadingMeta"
               :mode="mode"
+              :status="invalid(target.selectorType === 'name' && !target.clusterName)"
               required
             />
           </div>
@@ -240,6 +250,7 @@
               label="Label Selector (key=value, comma-separated)"
               :mode="mode"
               placeholder="e.g. environment=staging,region=eu"
+              :status="invalid(target.selectorType === 'selector' && !parseSelectorLabels(target.selectorLabels))"
             />
           </div>
         </div>
@@ -251,6 +262,7 @@
               label="Target Namespace"
               :mode="mode"
               placeholder="e.g. app"
+              :status="invalid(!target.namespace)"
               required
             />
           </div>
@@ -305,9 +317,10 @@ export default {
   data() {
     return {
       errors:          [],
+      submitted:       false,
       resourceName:    '',
       sourceMode:      'existing',
-      sourceNamespace: '',
+      sourceNamespace: 'cattle-secrets-system',
       sourceName:      '',
       localTargets:    [],
       namespaces:      [],
@@ -414,7 +427,7 @@ export default {
       const spec = this.value.spec || {};
       const ref  = spec.secretRef || {};
 
-      this.sourceNamespace = ref.namespace || '';
+      this.sourceNamespace = ref.namespace || 'cattle-secrets-system';
       this.sourceName      = ref.name      || '';
       this.paused          = !!spec.paused;
 
@@ -442,7 +455,7 @@ export default {
         selectorLabels:  '',
         clusterName:     '',
         clusterSelector: null,
-        namespace:       '',
+        namespace:       'default',
         secretName:      '',
       };
     },
@@ -513,7 +526,14 @@ export default {
       return name.replace(/[^-._a-zA-Z0-9]/g, '_');
     },
 
+    // Used by field :status bindings to highlight only the fields that are actually
+    // invalid, and only after a Create/Save attempt — not while the user is still filling in the form.
+    invalid(condition) {
+      return (this.submitted && condition) ? 'error' : null;
+    },
+
     willSave() {
+      this.submitted = true;
       this.errors = [];
 
       if (this.mode === 'create' && !this.resourceName) {
@@ -574,6 +594,9 @@ export default {
     async save(buttonCb) {
       if (!this.willSave()) {
         buttonCb(false);
+        this.$nextTick(() => {
+          document.getElementById('cru-errors')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
 
         return;
       }
@@ -655,6 +678,11 @@ export default {
   font-size: 12px;
   margin-top: 4px;
   opacity: 0.7;
+}
+
+.error-hint {
+  color: var(--error);
+  opacity: 1;
 }
 
 /* Key-value editor */
