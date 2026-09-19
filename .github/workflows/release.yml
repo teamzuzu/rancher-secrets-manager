@@ -184,3 +184,28 @@ jobs:
           gh release create "v${{ needs.resolve.outputs.version }}" \
             --title "v${{ needs.resolve.outputs.version }}" \
             --generate-notes
+
+      # ── Sync Chart.yaml on main ──────────────────────────────────────────────
+      # helm package (above) sets the released version via --version/--app-version
+      # regardless of what's checked into Chart.yaml, so this is bookkeeping only:
+      # keeps the source files from drifting away from the last released version.
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-checkout
+
+      - name: Sync Chart.yaml versions to main
+        run: |
+          VERSION="${{ needs.resolve.outputs.version }}"
+          for f in main-checkout/charts/rancher-secrets-manager/Chart.yaml \
+                   main-checkout/charts/rancher-secrets-manager-ui/Chart.yaml; do
+            sed -i -E "s/^version: .*/version: ${VERSION}/" "$f"
+            sed -i -E "s/^appVersion: .*/appVersion: \"${VERSION}\"/" "$f"
+          done
+          cd main-checkout
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add charts/rancher-secrets-manager/Chart.yaml charts/rancher-secrets-manager-ui/Chart.yaml
+          git diff --cached --quiet || git commit -m "chore(release): sync Chart.yaml to v${VERSION} [skip ci]"
+          git diff --cached --quiet || git push
