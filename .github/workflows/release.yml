@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version without v prefix (e.g. 0.1.0)'
+        description: 'Version without v prefix (e.g. 0.1.0) — must match an existing git tag'
         required: true
 
 permissions:
@@ -15,23 +15,76 @@ permissions:
   pages:    write
 
 jobs:
+  resolve:
+    name: Resolve Release Ref
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      ref: ${{ steps.ver.outputs.ref }}
+    steps:
+      - name: Resolve version and ref
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "ref=refs/tags/v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    name: Verify
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    steps:
+      # Checking out by tag ref means a manual workflow_dispatch run fails fast
+      # here if the tag was never pushed, instead of publishing an untagged release.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Go vet & test
+        run: |
+          go vet ./...
+          go test ./... -race
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: 'v3.21.0'
+
+      - name: Helm lint
+        run: |
+          helm lint charts/rancher-secrets-manager
+          helm lint charts/rancher-secrets-manager-ui
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ui/.nvmrc
+          cache: yarn
+          cache-dependency-path: ui/yarn.lock
+
+      - name: UI lint
+        working-directory: ui
+        run: |
+          yarn install --frozen-lockfile
+          yarn lint
+
   release:
     name: Build & Publish
+    needs: [resolve, verify]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.resolve.outputs.ref }}
           fetch-depth: 0
-
-      - name: Resolve version
-        id: ver
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          fi
 
       # ── Container image ─────────────────────────────────────────────────────
       - uses: docker/login-action@v3
@@ -45,7 +98,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ needs.resolve.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
 
       # ── UI extension bundle ──────────────────────────────────────────────────
@@ -58,7 +111,7 @@ jobs:
       - name: Build extension bundle
         working-directory: ui
         env:
-          VERSION: ${{ steps.ver.outputs.version }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
           yarn install --frozen-lockfile
           # Stamp the plugin package.json so the bundled metadata matches the release version.
@@ -83,23 +136,23 @@ jobs:
       - name: Package controller chart
         run: |
           helm package charts/rancher-secrets-manager \
-            --version "${{ steps.ver.outputs.version }}" \
-            --app-version "${{ steps.ver.outputs.version }}" \
+            --version "${{ needs.resolve.outputs.version }}" \
+            --app-version "${{ needs.resolve.outputs.version }}" \
             --destination gh-pages/
 
       - name: Package UI extension Helm chart
         run: |
           helm package charts/rancher-secrets-manager-ui \
-            --version "${{ steps.ver.outputs.version }}" \
-            --app-version "${{ steps.ver.outputs.version }}" \
+            --version "${{ needs.resolve.outputs.version }}" \
+            --app-version "${{ needs.resolve.outputs.version }}" \
             --destination gh-pages/
 
       - name: Copy extension JS bundles
         run: |
-          PLUGIN_DIR="gh-pages/extensions/rancher-secrets-manager/${{ steps.ver.outputs.version }}/plugin"
+          PLUGIN_DIR="gh-pages/extensions/rancher-secrets-manager/${{ needs.resolve.outputs.version }}/plugin"
           mkdir -p "$PLUGIN_DIR"
           # dist-pkg folder is named <package>-<version>
-          cp -r ui/dist-pkg/rancher-secrets-manager-${{ steps.ver.outputs.version }}/. "$PLUGIN_DIR/"
+          cp -r ui/dist-pkg/rancher-secrets-manager-${{ needs.resolve.outputs.version }}/. "$PLUGIN_DIR/"
           # Generate files.txt manifest required by Rancher's UI plugin caching system.
           # Format: "<sha256> <relative-path>", one entry per file.
           cd "$PLUGIN_DIR"
@@ -120,5 +173,14 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --cached --quiet || git commit -m "Release ${{ steps.ver.outputs.version }}"
+          git diff --cached --quiet || git commit -m "Release ${{ needs.resolve.outputs.version }}"
           git push
+
+      # ── GitHub Release ───────────────────────────────────────────────────────
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ needs.resolve.outputs.version }}" \
+            --title "v${{ needs.resolve.outputs.version }}" \
+            --generate-notes

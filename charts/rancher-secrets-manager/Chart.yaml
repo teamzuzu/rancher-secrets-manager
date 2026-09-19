@@ -2,8 +2,8 @@ apiVersion: v2
 name: rancher-secrets-manager
 description: Distributes secrets from the Rancher management cluster to downstream clusters.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.3.4
+appVersion: "0.3.4"
 keywords:
   - rancher
   - secrets
