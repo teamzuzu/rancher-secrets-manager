@@ -9,6 +9,11 @@ A Rancher plugin that implements a secrets manager for Rancher's management clus
 1. **Go controller** — a Kubernetes operator packaged as a Helm chart, deployed into the Rancher management cluster
 2. **Rancher UI Extension** — a Vue.js plugin for the Rancher dashboard
 
+## Git Workflow
+
+- Commit as the user configured in `.git/config` (`git config user.name` / `user.email`) — never as Claude or any other identity.
+- Push directly to `main`. Do not create feature branches or open pull requests for changes in this repo.
+
 ## Commands
 
 ### Go Controller
