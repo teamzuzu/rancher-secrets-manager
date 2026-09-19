@@ -2,8 +2,8 @@ apiVersion: v2
 name: rancher-secrets-manager-ui
 description: Rancher UI Extension — Secrets Manager dashboard for ManagedSecret resources
 type: application
-version: 0.3.4
-appVersion: "0.3.4"
+version: 0.3.5
+appVersion: "0.3.5"
 home: https://github.com/teamzuzu/rancher-secrets-manager
 keywords:
   - rancher
