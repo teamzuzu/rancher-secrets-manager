@@ -9,3 +9,4 @@ charts/rancher-secrets-manager/crds/
 *.kubeconfig-*
 .kubeconfig-*
 testbin/
+.claude/
