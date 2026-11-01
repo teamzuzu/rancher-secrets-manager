@@ -167,6 +167,14 @@ jobs:
           # so charts must live at the root of gh-pages, not in subdirectories.
           helm repo index gh-pages --url "$PAGES_URL" --merge gh-pages/index.yaml
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Keep the latest three chart versions
+        run: go run scripts/prune-helm-index.go gh-pages/index.yaml
+
       - name: Commit and push gh-pages
         run: |
           cd gh-pages

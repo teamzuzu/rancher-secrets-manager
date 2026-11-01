@@ -207,6 +207,9 @@ The workflow will:
 - Package and publish both Helm charts to GitHub Pages
 - Build and publish the UI extension bundle
 
+The Helm repository index lists only the newest three versions of each chart.
+Older chart archives and UI bundles remain available so existing installations keep working.
+
 ---
 
 ## Development
