@@ -605,10 +605,12 @@ export default {
         try {
           const secretObj = await this.$store.dispatch('cluster/create', {
             type:       'secret',
+            _type:      'Opaque',
             metadata:   { name: this.newSecret.name, namespace: this.newSecret.namespace },
-            stringData: this.newSecretData,
           });
 
+          // Steve expects base64-encoded data; use the Secret model's encoder.
+          secretObj.setData(this.newSecretData);
           await secretObj.save();
           this.sourceNamespace = this.newSecret.namespace;
           this.sourceName      = this.newSecret.name;

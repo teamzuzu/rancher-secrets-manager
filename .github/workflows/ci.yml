@@ -124,6 +124,9 @@ jobs:
       - name: Lint
         run: yarn lint
 
+      - name: Test
+        run: yarn test
+
   ui-build:
     name: UI Build
     needs: [ui-lint]
